@@ -78,7 +78,9 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ASYNC", 
 ignore = ["S101", "S311", "B008", "RUF012", "N818", "ASYNC109"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "E501"]
+# ASYNC210/221: some tests deliberately make a raw blocking request or spawn a process, to
+# bypass the MCP client and observe the HTTP or process layer directly.
+"tests/**" = ["S", "E501", "ASYNC210", "ASYNC221"]
 "servers/evil/**" = ["S", "E501"]
 "redteam/**" = ["S"]
 "bench/**" = ["S"]

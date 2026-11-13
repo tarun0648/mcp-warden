@@ -105,3 +105,42 @@ One line per decision, with the reason. Newest last.
 - **The app publishes its event loop on `app.state.loop`.** Upstream connections are owned by
   tasks in that loop; anything outside it (a test, operational tooling) must schedule work with
   `run_coroutine_threadsafe` instead of awaiting them directly.
+
+## Phase 4 — authentication
+
+- **A credential's *shape* picks the verifier; it never decides trust.** `wdn_` goes to the API
+  key store, three dot-separated segments to the token verifier, anything else is refused
+  without a database lookup. This keeps a JWT from being pointlessly hashed and looked up, and
+  keeps an unknown format from reaching either backend.
+- **The `alg` header is checked before any key material is loaded.** PyJWT is also given exactly
+  one algorithm, so even if the pre-check were removed it would not consult the token's own
+  claim. That one rule kills `alg=none`, HS256-with-the-published-public-key and
+  RS256 substitution together.
+- **The HS256 confusion test builds the token by hand.** PyJWT refuses to *encode* HS256 with a
+  PEM key, but an attacker has no such guardrail, so the test HMACs the signing input with the
+  public key bytes directly. Testing it through PyJWT's encoder would have tested PyJWT's
+  guardrail, not ours.
+- **An API key's prefix only narrows the lookup.** Two keys that share a prefix are both
+  fetched and separated by a full `hmac.compare_digest` on the hash. A test constructs a real
+  collision rather than faking one — the first version of that test was a no-op stub that passed
+  for the wrong reason.
+- **Two active signing keys, retired keys rejected rather than merely unverifiable.** A rotation
+  must not invalidate tokens already in flight, but a retired key must not be a lingering
+  signer; `jwks()` publishes only active keys and `verify` refuses any other `kid`.
+- **If we cannot tell whether a token was revoked, we refuse it.** A Redis failure propagates out
+  of `verify`, the middleware turns it into a 401, and the reason given to the caller is
+  "authentication is unavailable" (hard rule 1).
+- **401s never echo the credential**, and the reason is coarse ("unknown API key", not which
+  part was wrong). A test asserts the presented secret appears in neither body nor headers.
+- **Credentials are never forwarded upstream, structurally rather than by filtering.** The
+  gateway builds upstream connections from `servers.yaml` alone, so there is no code path that
+  could pass a client header through. A header-recording MCP server behind the gateway proves it.
+- **Alembic for deployment, `metadata.create_all` for tests, plus a drift test.** Running
+  migrations per test is slow; letting the two diverge is worse. The drift test reflects an
+  Alembic-migrated SQLite database and compares tables and columns against the models.
+- **The migration template imports `warden.db.base` and `Text` unconditionally.** Alembic's
+  autogenerate emits `warden.db.base.UtcDateTime(...)` and `JSONB(astext_type=Text())` without
+  adding the imports, so a freshly generated migration does not run.
+- **Test setup runs on its own loop in a worker thread.** A SQLAlchemy async engine binds its
+  connections to the loop that creates them, and the gateway under test runs in a uvicorn
+  thread; sharing one engine across both loops fails at the first query.

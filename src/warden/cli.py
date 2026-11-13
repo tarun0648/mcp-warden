@@ -8,13 +8,17 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Any
 
 import typer
 import uvicorn
 from rich.console import Console
 from rich.table import Table
 
+from warden.auth.api_keys import ApiKeyStore
+from warden.auth.jwt_keys import JwtKeyStore, KeyStoreError
+from warden.auth.tokens import TokenConfig, TokenService
 from warden.config import (
     GatewayConfig,
     PoliciesConfig,
@@ -24,6 +28,7 @@ from warden.config import (
     load_policies_config,
     load_servers_config,
 )
+from warden.db.engine import Database
 from warden.errors import ConfigError
 from warden.logging import configure_logging
 
@@ -176,6 +181,206 @@ def _one_line(text: str) -> str:
             cleaned.append(f"<U+{ord(char):04X}>")
     collapsed = " ".join("".join(cleaned).split())
     return collapsed[:300] + ("..." if len(collapsed) > 300 else "")
+
+
+# ----------------------------------------------------------------------------------------------
+# Database
+# ----------------------------------------------------------------------------------------------
+
+db_app = typer.Typer(help="Database schema management.", no_args_is_help=True)
+app.add_typer(db_app, name="db")
+
+
+def _alembic_config() -> Any:
+    from alembic.config import Config
+
+    root = Path(__file__).resolve().parents[2]
+    config = Config(str(root / "alembic.ini"))
+    config.set_main_option("script_location", str(root / "migrations"))
+    return config
+
+
+@db_app.command("upgrade")
+def db_upgrade(
+    revision: Annotated[str, typer.Argument(help="Target revision.")] = "head",
+) -> None:
+    """Apply migrations up to `revision`."""
+    from alembic import command
+
+    command.upgrade(_alembic_config(), revision)
+    console.print(f"[green]ok[/green] database is at {revision}")
+
+
+@db_app.command("downgrade")
+def db_downgrade(
+    revision: Annotated[str, typer.Argument(help="Target revision.")],
+) -> None:
+    """Roll migrations back to `revision`."""
+    from alembic import command
+
+    command.downgrade(_alembic_config(), revision)
+    console.print(f"[green]ok[/green] database is at {revision}")
+
+
+@db_app.command("current")
+def db_current() -> None:
+    """Print the revision the database is on."""
+    from alembic import command
+
+    command.current(_alembic_config(), verbose=True)
+
+
+# ----------------------------------------------------------------------------------------------
+# Credentials
+# ----------------------------------------------------------------------------------------------
+
+keys_app = typer.Typer(help="API keys and JWT signing keys.", no_args_is_help=True)
+app.add_typer(keys_app, name="keys")
+
+
+def _database() -> Database:
+    return Database(_settings().database_url)
+
+
+@keys_app.command("create")
+def keys_create(
+    user: Annotated[str, typer.Option(help="The user id the key authenticates as.")],
+    roles: Annotated[str, typer.Option(help="Comma-separated roles, e.g. reader,editor.")],
+    label: Annotated[str | None, typer.Option(help="A note about where this key is used.")] = None,
+) -> None:
+    """Mint an API key. The secret is printed once and cannot be recovered."""
+    role_list = [role.strip() for role in roles.split(",") if role.strip()]
+    if not role_list:
+        console.print("[red]error:[/red] give at least one role")
+        raise typer.Exit(code=2)
+    generated = asyncio.run(_create_key(user, role_list, label))
+    console.print("[green]key created.[/green] This is the only time it is shown:")
+    console.print(f"\n  [bold]{generated.secret}[/bold]\n")
+    console.print(f"  prefix: {generated.prefix}   user: {user}   roles: {', '.join(role_list)}")
+    console.print("Store it in a password manager or a secret store. Never commit it.")
+
+
+async def _create_key(user: str, roles: list[str], label: str | None) -> Any:
+    database = _database()
+    try:
+        return await ApiKeyStore(database).create(user, roles, label=label)
+    finally:
+        await database.dispose()
+
+
+@keys_app.command("list")
+def keys_list(
+    active_only: Annotated[bool, typer.Option(help="Hide revoked keys.")] = False,
+) -> None:
+    """List API keys. Never prints a secret or a hash."""
+    rows = asyncio.run(_list_keys(not active_only))
+    table = Table(title="api keys")
+    for column in ("prefix", "user", "roles", "label", "created", "last used", "revoked"):
+        table.add_column(column)
+    for row in rows:
+        table.add_row(
+            row["prefix"],
+            row["user_id"],
+            ", ".join(row["roles"]),
+            row["label"] or "-",
+            row["created_at"][:19],
+            (row["last_used_at"] or "-")[:19],
+            (row["revoked_at"] or "-")[:19],
+        )
+    console.print(table)
+
+
+async def _list_keys(include_revoked: bool) -> list[dict[str, Any]]:
+    database = _database()
+    try:
+        keys = await ApiKeyStore(database).list_keys(include_revoked=include_revoked)
+        return [key.as_dict() for key in keys]
+    finally:
+        await database.dispose()
+
+
+@keys_app.command("revoke")
+def keys_revoke(
+    prefix: Annotated[str, typer.Argument(help="The key prefix shown by `warden keys list`.")],
+) -> None:
+    """Revoke every key with this prefix. Takes effect on the next request."""
+    count = asyncio.run(_revoke_key(prefix))
+    if count == 0:
+        console.print(f"[yellow]no active key with prefix {prefix}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]ok[/green] revoked {count} key(s) with prefix {prefix}")
+
+
+async def _revoke_key(prefix: str) -> int:
+    database = _database()
+    try:
+        return await ApiKeyStore(database).revoke(prefix)
+    finally:
+        await database.dispose()
+
+
+@keys_app.command("init-jwt")
+def keys_init_jwt() -> None:
+    """Create the ES256 signing key, if there is not one already."""
+    settings = _settings()
+    kid = JwtKeyStore(settings.jwt_key_dir).initialise()
+    console.print(f"[green]ok[/green] active signing key: {kid}")
+    console.print(f"  private keys live in {settings.jwt_key_dir} (gitignored, mode 0600)")
+
+
+@keys_app.command("rotate-jwt")
+def keys_rotate_jwt() -> None:
+    """Add a new signing key, keeping the previous one able to verify."""
+    settings = _settings()
+    store = JwtKeyStore(settings.jwt_key_dir)
+    kid = store.rotate()
+    state = store.read_state()
+    console.print(f"[green]ok[/green] new signing key: {kid}")
+    console.print(f"  active (verify + sign): {', '.join(state.active)}")
+    console.print(f"  retired (rejected):     {', '.join(state.retired) or 'none'}")
+
+
+@keys_app.command("jwks")
+def keys_jwks() -> None:
+    """Print the public JWKS document the gateway serves."""
+    settings = _settings()
+    console.print_json(data=JwtKeyStore(settings.jwt_key_dir).jwks())
+
+
+token_app = typer.Typer(help="Development token issuing.", no_args_is_help=True)
+app.add_typer(token_app, name="token")
+
+
+@token_app.command("create")
+def token_create(
+    user: Annotated[str, typer.Option(help="The subject the token authenticates as.")],
+    roles: Annotated[str, typer.Option(help="Comma-separated roles.")],
+    ttl: Annotated[int, typer.Option(help="Lifetime in seconds.")] = 900,
+) -> None:
+    """Issue a short-lived ES256 token. A real deployment uses an external OAuth server."""
+    settings = _settings()
+    role_list = [role.strip() for role in roles.split(",") if role.strip()]
+    if not role_list:
+        console.print("[red]error:[/red] give at least one role")
+        raise typer.Exit(code=2)
+    service = TokenService(
+        JwtKeyStore(settings.jwt_key_dir),
+        TokenConfig(
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
+            default_ttl_seconds=settings.jwt_default_ttl_seconds,
+            clock_skew_seconds=settings.jwt_clock_skew_seconds,
+        ),
+    )
+    try:
+        issued = service.issue(user, role_list, ttl_seconds=ttl)
+    except KeyStoreError as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(code=2) from exc
+    console.print(issued.token)
+    console.print(
+        f"[dim]jti={issued.jti} expires_at={issued.expires_at} aud={settings.jwt_audience}[/dim]"
+    )
 
 
 def main() -> None:

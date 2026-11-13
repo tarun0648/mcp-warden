@@ -21,6 +21,17 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from warden.auth.api_keys import ApiKeyStore
+from warden.auth.jwt_keys import JwtKeyStore, KeyStoreError
+from warden.auth.middleware import Authenticator, AuthMiddleware, principal_from_request
+from warden.auth.stage import Authenticate
+from warden.auth.tokens import (
+    NullRevocationStore,
+    RedisRevocationStore,
+    RevocationStore,
+    TokenConfig,
+    TokenService,
+)
 from warden.config import (
     GatewayConfig,
     ServersConfig,
@@ -28,6 +39,7 @@ from warden.config import (
     load_gateway_config,
     load_servers_config,
 )
+from warden.db.engine import Database
 from warden.health import Readiness, postgres_check, redis_check
 from warden.logging import configure_logging, get_logger, request_id_var
 from warden.pipeline import Pipeline
@@ -40,6 +52,11 @@ logger = get_logger(__name__)
 
 REQUEST_ID_HEADER = "x-request-id"
 MCP_PATH = "/mcp"
+JWKS_PATH = "/.well-known/jwks.json"
+PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
+#: Paths that require a credential. Public by design: the health checks (a load balancer has no
+#: credential) and the two well-known documents (a client must read them to get one).
+PROTECTED_PREFIXES = (MCP_PATH, "/admin")
 
 
 def default_readiness(settings: Settings) -> Readiness:
@@ -120,6 +137,58 @@ def _safe_request_id(value: str | None) -> str | None:
     return None
 
 
+def make_jwks(keys: JwtKeyStore) -> Callable[[Request], Awaitable[Response]]:
+    """Serve the public half of the signing keys so a client can verify a token itself."""
+
+    async def jwks(_: Request) -> Response:
+        try:
+            document = keys.jwks()
+        except KeyStoreError as exc:
+            logger.warning(
+                "jwks requested but no keys exist", extra={"warden": {"error": str(exc)}}
+            )
+            return JSONResponse({"keys": []}, status_code=503)
+        return JSONResponse(document, headers={"Cache-Control": "public, max-age=300"})
+
+    return jwks
+
+
+def make_protected_resource_metadata(
+    settings: Settings,
+) -> Callable[[Request], Awaitable[Response]]:
+    """OAuth 2.0 protected-resource metadata, as the MCP authorization spec expects.
+
+    The dev issuer is this gateway itself (`warden token create`). A real deployment points
+    `authorization_servers` at an external OAuth 2.1 server and stops issuing its own tokens;
+    the verification path does not change. See docs/threat-model.md.
+    """
+
+    async def metadata(_: Request) -> Response:
+        return JSONResponse(
+            {
+                "resource": settings.warden_resource_url,
+                "authorization_servers": [settings.jwt_issuer],
+                "bearer_methods_supported": ["header"],
+                "jwks_uri": f"{settings.jwt_issuer.rstrip('/')}{JWKS_PATH}",
+                "scopes_supported": [],
+                "resource_documentation": "https://github.com/your-handle/mcp-warden",
+            },
+            headers={"Cache-Control": "public, max-age=300"},
+        )
+
+    return metadata
+
+
+def build_revocation_store(settings: Settings) -> RevocationStore:
+    """Redis-backed revocation when a Redis URL is configured, else an explicit no-op."""
+    if not settings.redis_url:
+        logger.warning("no redis url configured; token revocation will not work")
+        return NullRevocationStore()
+    import redis.asyncio as aioredis
+
+    return RedisRevocationStore(aioredis.from_url(settings.redis_url))
+
+
 def build_upstream_manager(
     gateway_config: GatewayConfig, servers_config: ServersConfig
 ) -> UpstreamManager:
@@ -135,17 +204,17 @@ def build_upstream_manager(
 def build_pipeline_factory(
     registry: ToolRegistry, servers_config: ServersConfig, upstreams: UpstreamManager
 ) -> Callable[[], Pipeline]:
-    """The Phase 3 pipeline: resolve the tool, then forward it.
+    """The pipeline, in the one order that is the security contract.
 
-    Later phases insert Authenticate, DefinitionIntegrity, Policy, RateLimit, ArgumentDLP and
-    Approval before `forward`, and OutputScan after it. The order is the security contract, so
-    it lives in one place.
+    Phase 4: authenticate, resolve, forward. Later phases insert DefinitionIntegrity, Policy,
+    RateLimit and ArgumentDLP and Approval before `forward`, and OutputScan after it.
     """
+    authenticate = Authenticate()
     resolve = ResolveTool(registry, servers_config)
     forward = ForwardToUpstream(upstreams)
 
     def factory() -> Pipeline:
-        return Pipeline([resolve, forward])
+        return Pipeline([authenticate, resolve, forward])
 
     return factory
 
@@ -157,6 +226,8 @@ def create_app(
     gateway_config: GatewayConfig | None = None,
     servers_config: ServersConfig | None = None,
     upstreams: UpstreamManager | None = None,
+    database: Database | None = None,
+    revocations: RevocationStore | None = None,
     mount_mcp: bool = True,
     upstream_wait_seconds: float = 0.0,
 ) -> Starlette:
@@ -182,6 +253,25 @@ def create_app(
     manager = upstreams if upstreams is not None else build_upstream_manager(gateway, servers)
     manager.on_tools_changed = registry.replace
 
+    db = database if database is not None else Database(settings.database_url)
+    jwt_keys = JwtKeyStore(settings.jwt_key_dir)
+    token_service = TokenService(
+        jwt_keys,
+        TokenConfig(
+            issuer=settings.jwt_issuer,
+            audience=settings.jwt_audience,
+            default_ttl_seconds=settings.jwt_default_ttl_seconds,
+            clock_skew_seconds=settings.jwt_clock_skew_seconds,
+        ),
+        revocations if revocations is not None else build_revocation_store(settings),
+    )
+    authenticator = Authenticator(api_keys=ApiKeyStore(db), tokens=token_service)
+
+    routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
+    routes.append(
+        Route(PROTECTED_RESOURCE_PATH, make_protected_resource_metadata(settings), methods=["GET"])
+    )
+
     mcp_server: Server[object] | None = None
     session_manager: StreamableHTTPSessionManager | None = None
 
@@ -193,6 +283,7 @@ def create_app(
             registry=registry,
             upstreams=manager,
             pipeline_factory=build_pipeline_factory(registry, servers, manager),
+            principal_resolver=lambda ctx: principal_from_request(ctx.request),
         )
         mcp_server = build_mcp_server(deps)
         session_manager = StreamableHTTPSessionManager(
@@ -223,8 +314,22 @@ def create_app(
                 await manager.stop()
 
     app = Starlette(routes=routes, lifespan=lifespan)
+    # Starlette wraps in reverse order of addition, so the request-id middleware added last is
+    # the outermost: a 401 from the auth middleware still carries a request id.
+    app.add_middleware(
+        AuthMiddleware,
+        authenticator=authenticator,
+        protected_prefixes=PROTECTED_PREFIXES,
+        resource_metadata_url=(
+            f"{settings.warden_resource_url.rsplit('/mcp', 1)[0]}{PROTECTED_RESOURCE_PATH}"
+        ),
+    )
     app.add_middleware(RequestIdMiddleware)
     app.state.settings = settings
+    app.state.database = db
+    app.state.jwt_keys = jwt_keys
+    app.state.tokens = token_service
+    app.state.authenticator = authenticator
     app.state.readiness = checks
     app.state.gateway_config = gateway
     app.state.servers_config = servers
@@ -235,7 +340,10 @@ def create_app(
 
 
 __all__ = [
+    "JWKS_PATH",
     "MCP_PATH",
+    "PROTECTED_PREFIXES",
+    "PROTECTED_RESOURCE_PATH",
     "RequestIdMiddleware",
     "build_pipeline_factory",
     "build_upstream_manager",

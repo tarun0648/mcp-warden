@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import os
 import socket
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -82,6 +83,63 @@ def servers_config() -> ServersConfig:
 @pytest.fixture
 def policies_config() -> PoliciesConfig:
     return load_policies_config(CONFIG_DIR / "policies.yaml")
+
+
+@pytest.fixture
+async def database(tmp_path: Path) -> AsyncIterator[Any]:
+    """A Database on a temporary SQLite file, with every table created."""
+    from warden.db.engine import Database
+
+    db = Database(f"sqlite+aiosqlite:///{tmp_path / 'warden.sqlite3'}")
+    await db.create_all()
+    try:
+        yield db
+    finally:
+        await db.dispose()
+
+
+@pytest.fixture
+def api_keys(database: Any) -> Any:
+    from warden.auth.api_keys import ApiKeyStore
+
+    return ApiKeyStore(database)
+
+
+@pytest.fixture
+def jwt_store(tmp_path: Path) -> Any:
+    """A JWT key store with one signing key already created."""
+    from warden.auth.jwt_keys import JwtKeyStore
+
+    store = JwtKeyStore(tmp_path / "keys")
+    store.initialise()
+    return store
+
+
+@pytest.fixture
+def token_config() -> Any:
+    from warden.auth.tokens import TokenConfig
+
+    return TokenConfig(
+        issuer="http://localhost:8080",
+        audience="http://localhost:8080/mcp",
+        default_ttl_seconds=900,
+        clock_skew_seconds=30,
+    )
+
+
+@pytest.fixture
+def fake_redis() -> Any:
+    """An in-process Redis stand-in. Unit tests never reach a real server."""
+    import fakeredis.aioredis
+
+    return fakeredis.aioredis.FakeRedis()
+
+
+@pytest.fixture
+def tokens(jwt_store: Any, token_config: Any, fake_redis: Any) -> Any:
+    from warden.auth.tokens import RedisRevocationStore, TokenService
+
+    return TokenService(jwt_store, token_config, RedisRevocationStore(fake_redis))
 
 
 @pytest.fixture

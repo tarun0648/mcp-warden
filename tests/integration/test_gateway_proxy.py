@@ -13,7 +13,7 @@ pytestmark = pytest.mark.integration
 
 async def test_tools_list_is_namespaced_and_aggregated(tmp_path: Path) -> None:
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             listing = await client.list_tools()
     names = {tool.name for tool in listing.tools}
     assert "notes_db__list_notes" in names
@@ -25,7 +25,7 @@ async def test_tools_list_is_namespaced_and_aggregated(tmp_path: Path) -> None:
 
 async def test_descriptions_survive_the_proxy(tmp_path: Path) -> None:
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             listing = await client.list_tools()
     tool = next(t for t in listing.tools if t.name == "notes_db__list_notes")
     assert tool.description == "List notes, oldest first."
@@ -34,7 +34,7 @@ async def test_descriptions_survive_the_proxy(tmp_path: Path) -> None:
 
 async def test_write_then_read_round_trips_through_the_gateway(tmp_path: Path) -> None:
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             written = payload(
                 await client.call_tool(
                     "files__write_file", {"path": "notes/a.md", "content": "hello gateway"}
@@ -48,14 +48,14 @@ async def test_write_then_read_round_trips_through_the_gateway(tmp_path: Path) -
 
 async def test_notes_tools_work_through_the_gateway(tmp_path: Path) -> None:
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             listed = payload(await client.call_tool("notes_db__list_notes", {"limit": 3}))
     assert len(listed["notes"]) == 3
 
 
 async def test_unknown_tool_is_denied_with_a_reason_code(tmp_path: Path) -> None:
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             result = await client.call_tool("files__nope", {})
             other = await client.call_tool("not_namespaced", {})
     assert "WARDEN_UNKNOWN_TOOL" in error_text(result)
@@ -68,7 +68,7 @@ async def test_unknown_tool_is_denied_with_a_reason_code(tmp_path: Path) -> None
 async def test_upstream_error_is_mapped_not_leaked(tmp_path: Path) -> None:
     """An upstream tool's own error comes back as the upstream's is_error result, intact."""
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             result = await client.call_tool("files__read_file", {"path": "missing.txt"})
     assert result.is_error
     assert "no such file" in error_text(result)
@@ -83,7 +83,7 @@ async def test_killing_one_upstream_removes_only_its_tools(tmp_path: Path) -> No
             "tools_refresh_seconds": 1.0,
         },
     ) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             before = {tool.name for tool in (await client.list_tools()).tools}
             assert any(name.startswith("files__") for name in before)
 
@@ -108,7 +108,7 @@ async def test_killing_one_upstream_removes_only_its_tools(tmp_path: Path) -> No
 
 async def test_slow_upstream_hits_the_timeout(tmp_path: Path) -> None:
     with running_gateway(tmp_path, include_evil=True, evil_timeout=1.0) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("redteam")) as client:
             result = await client.call_tool("evil__slow_tool", {"seconds": 10})
     assert "WARDEN_UPSTREAM_TIMEOUT" in error_text(result)
     assert result.structured_content is not None
@@ -119,7 +119,7 @@ async def test_twenty_concurrent_calls_all_succeed(tmp_path: Path) -> None:
     import asyncio
 
     with running_gateway(tmp_path) as gateway:
-        async with gateway_client(gateway) as client:
+        async with gateway_client(gateway, gateway.auth("admin")) as client:
             results = await asyncio.gather(
                 *(
                     client.call_tool("notes_db__get_note", {"note_id": (index % 10) + 1})

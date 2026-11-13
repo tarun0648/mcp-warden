@@ -16,7 +16,7 @@ import threading
 import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -173,6 +173,13 @@ class RunningGateway:
 
     url: str
     app: Any
+    #: Credentials minted for the test, by role name.
+    keys: dict[str, str] = field(default_factory=dict)
+    database_url: str = ""
+
+    def auth(self, role: str = "admin") -> dict[str, str]:
+        """An Authorization header for the credential minted for `role`."""
+        return {"Authorization": f"Bearer {self.keys[role]}"}
 
     @property
     def mcp_url(self) -> str:
@@ -227,6 +234,61 @@ def serve_app(
         thread.join(timeout=30)
 
 
+#: Roles the test gateway mints an API key for, so a test can call as any of them.
+TEST_ROLES = ("admin", "reader", "editor", "redteam")
+
+
+def run_async(factory: Any) -> Any:
+    """Run `factory()` on a fresh event loop in a worker thread.
+
+    Needed because an async test already owns the loop in its own thread, and a SQLAlchemy
+    async engine binds its connections to whichever loop creates them. Setup work therefore
+    gets its own loop *and* its own engine, disposed before the gateway starts.
+    """
+    outcome: dict[str, Any] = {}
+
+    def target() -> None:
+        try:
+            outcome["value"] = asyncio.run(factory())
+        except BaseException as exc:
+            outcome["error"] = exc
+
+    thread = threading.Thread(target=target, name="test-async-setup")
+    thread.start()
+    thread.join(120)
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome.get("value")
+
+
+def prepare_gateway_state(settings: Any) -> dict[str, str]:
+    """Create the schema, the signing key, and one API key per test role.
+
+    Returns the raw secrets by role. The engine used here is thrown away: the gateway builds
+    its own inside the server thread's loop, where every connection it makes will live.
+    """
+    from warden.auth.api_keys import ApiKeyStore
+    from warden.auth.jwt_keys import JwtKeyStore
+    from warden.db.engine import Database
+
+    JwtKeyStore(settings.jwt_key_dir).initialise()
+
+    async def setup() -> dict[str, str]:
+        database = Database(settings.database_url)
+        try:
+            await database.create_all()
+            store = ApiKeyStore(database)
+            minted: dict[str, str] = {}
+            for role in TEST_ROLES:
+                generated = await store.create(f"{role}-user", [role], label=f"test {role}")
+                minted[role] = generated.secret
+            return minted
+        finally:
+            await database.dispose()
+
+    return run_async(setup)
+
+
 @contextmanager
 def running_gateway(
     tmp_path: Path,
@@ -234,27 +296,119 @@ def running_gateway(
     include_evil: bool = False,
     settings_overrides: dict[str, Any] | None = None,
     gateway_overrides: dict[str, Any] | None = None,
+    servers_config: Any | None = None,
     wait_upstreams: float = 40.0,
     **servers_kwargs: Any,
 ) -> Iterator[RunningGateway]:
-    """A fully wired gateway in front of real upstream subprocesses."""
+    """A fully wired gateway in front of real upstream subprocesses, with credentials minted."""
+    from warden.auth.tokens import NullRevocationStore
     from warden.config import GatewayConfig
     from warden.health import Readiness
     from warden.main import create_app
 
     settings = test_settings(tmp_path, **(settings_overrides or {}))
-    servers = test_servers_config(tmp_path, include_evil=include_evil, **servers_kwargs)
+    servers = (
+        servers_config
+        if servers_config is not None
+        else test_servers_config(tmp_path, include_evil=include_evil, **servers_kwargs)
+    )
+    keys = prepare_gateway_state(settings)
     gateway_config = GatewayConfig(**(gateway_overrides or {}))
     app = create_app(
         settings,
         readiness=Readiness({}),
         gateway_config=gateway_config,
         servers_config=servers,
+        # Integration tests must not need a Redis daemon; revocation has its own unit tests
+        # against fakeredis and its own Redis-marked integration test.
+        revocations=NullRevocationStore(),
         upstream_wait_seconds=wait_upstreams,
     )
     with serve_app(app) as handle:
+        handle.keys.update(keys)
+        handle.database_url = settings.database_url
         wait_for_tools(handle, timeout=wait_upstreams + 20)
         yield handle
+
+
+@contextmanager
+def header_recording_upstream(
+    port: int | None = None,
+) -> Iterator[tuple[str, list[dict[str, str]]]]:
+    """An MCP server over HTTP that records the headers of every request it receives.
+
+    Used to prove the gateway never forwards a client's Authorization header to an upstream.
+    """
+    import mcp_types as types
+    from mcp.server.lowlevel.server import Server
+    from mcp.server.streamable_http_manager import (
+        StreamableHTTPASGIApp,
+        StreamableHTTPSessionManager,
+    )
+    from mcp.server.transport_security import TransportSecuritySettings
+    from starlette.applications import Starlette
+    from starlette.routing import Route
+
+    seen: list[dict[str, str]] = []
+
+    async def on_list_tools(_ctx: Any, _params: Any) -> types.ListToolsResult:
+        return types.ListToolsResult(
+            tools=[
+                types.Tool(
+                    name="echo",
+                    description="Return the text it was given.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"text": {"type": "string"}},
+                        "required": ["text"],
+                    },
+                )
+            ]
+        )
+
+    async def on_call_tool(_ctx: Any, params: types.CallToolRequestParams) -> types.CallToolResult:
+        text = str((params.arguments or {}).get("text", ""))
+        return types.CallToolResult(content=[types.TextContent(type="text", text=text)])
+
+    server: Server[Any] = Server(
+        name="recorder",
+        version="0.1.0",
+        on_list_tools=on_list_tools,
+        on_call_tool=on_call_tool,
+    )
+    manager = StreamableHTTPSessionManager(
+        app=server,
+        security_settings=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    )
+
+    class Recorder:
+        def __init__(self, inner: Any) -> None:
+            self.inner = inner
+
+        async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+            if scope["type"] == "http":
+                seen.append(
+                    {
+                        bytes(k).decode("latin-1").lower(): bytes(v).decode("latin-1")
+                        for k, v in scope.get("headers", [])
+                    }
+                )
+            await self.inner(scope, receive, send)
+
+    import contextlib as _contextlib
+
+    @_contextlib.asynccontextmanager
+    async def lifespan(_: Any) -> AsyncIterator[None]:
+        async with manager.run():
+            yield
+
+    app = Starlette(
+        routes=[Route("/mcp", endpoint=Recorder(StreamableHTTPASGIApp(manager)))],
+        lifespan=lifespan,
+    )
+    chosen = port or free_port()
+    with serve_app(app, port=chosen):
+        yield f"http://127.0.0.1:{chosen}/mcp", seen
 
 
 def wait_for_tools(handle: RunningGateway, *, timeout: float = 60.0, minimum: int = 1) -> None:
