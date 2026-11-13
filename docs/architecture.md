@@ -101,3 +101,72 @@ one slow or dead upstream cannot stall another.
 Every one of these is a `CallToolResult` with `isError=true` and a `structured_content` body
 carrying `error`, `reason` and `request_id`, because the caller is usually a model that has to
 understand what happened.
+
+## Observability
+
+### Tracing
+
+The SDK does two parts of this already, so the gateway builds on them rather than duplicating
+them:
+
+- **The root span.** `mcp.server._otel.OpenTelemetryMiddleware` is installed by default on the
+  low-level `Server`, so every inbound request gets a SERVER span with the current semantic
+  conventions: `mcp.method.name`, `mcp.protocol.version`, `jsonrpc.request.id`, and for a tool
+  call `gen_ai.operation.name = "execute_tool"` plus `gen_ai.tool.name`.
+- **Context propagation.** The SDK's JSON-RPC dispatcher injects W3C `traceparent` into
+  outbound `_meta`, so an upstream running the SDK joins the same trace. There is an
+  integration test for it rather than an assumption.
+
+The gateway adds one `warden tools/call` span per request and one `stage <name>` span per
+pipeline stage. Attributes used, beyond the SDK's:
+
+| Attribute | Meaning |
+| --- | --- |
+| `warden.request.id` | The id echoed in `x-request-id` and in every audit row |
+| `warden.principal.id`, `warden.auth.method` | Who called, and with which credential type |
+| `warden.stage` | Which pipeline stage this span is |
+| `warden.decision`, `warden.reason_code` | `allow` / `deny` / `pending`, and the `WARDEN_*` code |
+| `warden.matched_rule` | The policy rule that decided |
+| `warden.risk` | `read` / `write` / `destructive` |
+| `warden.upstream`, `warden.forwarded` | Which server, and whether it was actually reached |
+| `warden.result.bytes` | Size only, never content |
+| `warden.scan.verdict`, `warden.scan.rules` | What the scanners found |
+| `warden.classifier.score` | The local classifier's probability, when it ran |
+| `warden.approval.id`, `warden.quarantine.reason` | Why a call waited or was refused |
+| `error.type` | Set to the reason code on a denial, which also sets span status ERROR |
+
+**No argument, result or credential is ever a span attribute.** Spans go to a collector that is
+normally outside the trust boundary the audit log sits inside, and nothing downstream redacts
+them. `set_attributes` enforces an allowlist and logs an error if code tries to set anything
+else, so one hurried `span.set_attribute("args", ...)` cannot leak call arguments. Two tests
+cover it: a canary check over every span and event, and a direct attempt to set a
+non-allowlisted attribute.
+
+Every log line emitted while handling a request carries `trace_id` and `span_id`, so a log
+line can be followed into its trace.
+
+### Metrics
+
+`/metrics` in Prometheus text format. Served to loopback without a credential — that is how a
+sidecar Prometheus scrapes it — and to the `admin` role otherwise; `METRICS_ALLOW_LOCALHOST=false`
+requires the credential from everywhere. The endpoint is on the auth middleware's *optional*
+list: a credential is verified if present and not required, so the endpoint itself can make
+that choice.
+
+| Metric | Type | Labels |
+| --- | --- | --- |
+| `warden_requests_total` | counter | `decision`, `reason`, `tool` |
+| `warden_denials_total` | counter | `reason` |
+| `warden_stage_duration_seconds` | histogram | `stage` |
+| `warden_upstream_duration_seconds` | histogram | `upstream` |
+| `warden_upstream_up`, `warden_upstream_tools` | gauge | `upstream` |
+| `warden_quarantined_tools`, `warden_pending_approvals` | gauge | — |
+| `warden_classifier_seconds` | histogram | — |
+
+Label cardinality is the design constraint. `tool` is bounded by the registry and anything not
+in it is recorded as the literal `unknown`, so a caller inventing names cannot create a time
+series per name. `principal` is not a label at all: it is unbounded by definition, and
+per-caller usage already lives in the audit log and `/admin/usage`.
+
+`make up-observability` starts Prometheus (`:9090`) and Grafana (`:3000`) with the datasource
+and the `mcp-warden` dashboard provisioned from `deploy/grafana/`.

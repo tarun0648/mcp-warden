@@ -189,3 +189,54 @@ async def test_authenticator_without_backends_refuses_everything() -> None:
 
 def test_principal_from_request_handles_no_request() -> None:
     assert principal_from_request(None) is None
+
+
+# -- optional authentication -------------------------------------------------------------------
+
+
+def build_app_with_optional(authenticator: Authenticator) -> Starlette:
+    """An app where /metrics verifies a credential if one is sent but does not require one."""
+
+    async def whoami(request: Request) -> JSONResponse:
+        principal = principal_from_request(request)
+        return JSONResponse({"user": principal.user_id if principal else None})
+
+    app = Starlette(routes=[Route("/metrics", whoami, methods=["GET"])])
+    app.add_middleware(
+        AuthMiddleware,
+        authenticator=authenticator,
+        protected_prefixes=("/mcp",),
+        optional_prefixes=("/metrics",),
+        resource_metadata_url=RESOURCE_METADATA,
+    )
+    return app
+
+
+async def test_an_optional_path_works_without_a_credential(
+    api_keys: ApiKeyStore, tokens: TokenService
+) -> None:
+    app = build_app_with_optional(Authenticator(api_keys=api_keys, tokens=tokens))
+    with TestClient(app) as client:
+        response = client.get("/metrics")
+    assert response.status_code == 200
+    assert response.json() == {"user": None}
+
+
+async def test_an_optional_path_attaches_a_valid_credential(
+    api_keys: ApiKeyStore, tokens: TokenService
+) -> None:
+    generated = await api_keys.create("admin-user", ["admin"])
+    app = build_app_with_optional(Authenticator(api_keys=api_keys, tokens=tokens))
+    with TestClient(app) as client:
+        response = client.get("/metrics", headers={"Authorization": f"Bearer {generated.secret}"})
+    assert response.json() == {"user": "admin-user"}
+
+
+async def test_an_optional_path_still_rejects_a_wrong_credential(
+    api_keys: ApiKeyStore, tokens: TokenService
+) -> None:
+    """Silently ignoring a bad credential would hide a misconfigured scraper."""
+    app = build_app_with_optional(Authenticator(api_keys=api_keys, tokens=tokens))
+    with TestClient(app) as client:
+        response = client.get("/metrics", headers={"Authorization": "Bearer wdn_" + "x" * 32})
+    assert response.status_code == 401

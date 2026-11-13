@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from warden.config import Risk
 from warden.errors import ReasonCode
 from warden.logging import get_logger
+from warden.telemetry.tracing import stage_span
 
 if TYPE_CHECKING:
     from mcp_types import CallToolResult
@@ -137,6 +138,13 @@ class Stage(Protocol):
 FinishHook = Callable[[RequestContext], Awaitable[None]]
 
 
+def _mark_denial(span: Any, ctx: RequestContext) -> None:
+    """Record on the stage span that this is the stage that stopped the request."""
+    from warden.telemetry.tracing import ATTR_DECISION, ATTR_REASON, set_attributes
+
+    set_attributes(span, {ATTR_DECISION: str(ctx.decision), ATTR_REASON: str(ctx.reason_code)})
+
+
 class Pipeline:
     """Runs stages in order, records per-stage timing, and always runs the finish hooks."""
 
@@ -159,19 +167,26 @@ class Pipeline:
                 if ctx.stopped:
                     break
                 started = time.perf_counter()
-                try:
-                    await stage.run(ctx)
-                except Exception:
-                    logger.exception(
-                        "pipeline stage raised",
-                        extra={"warden": {"stage": stage.name, "tool": ctx.tool_name}},
-                    )
-                    ctx.deny(
-                        ReasonCode.DENIED_INTERNAL,
-                        f"the {stage.name} stage failed; the call was not forwarded",
-                    )
-                finally:
-                    ctx.stage_timings_ms[stage.name] = (time.perf_counter() - started) * 1000
+                # One span per stage, so a trace shows where a request was refused and what it
+                # cost to get there. `stage_span` is a no-op context manager when tracing is
+                # off, which is the default.
+                with stage_span(stage.name, ctx.tool_name) as span:
+                    try:
+                        await stage.run(ctx)
+                    except Exception:
+                        logger.exception(
+                            "pipeline stage raised",
+                            extra={"warden": {"stage": stage.name, "tool": ctx.tool_name}},
+                        )
+                        ctx.deny(
+                            ReasonCode.DENIED_INTERNAL,
+                            f"the {stage.name} stage failed; the call was not forwarded",
+                        )
+                    finally:
+                        elapsed = (time.perf_counter() - started) * 1000
+                        ctx.stage_timings_ms[stage.name] = elapsed
+                        if span is not None and ctx.stopped:
+                            _mark_denial(span, ctx)
         finally:
             await self._finish(ctx)
         return ctx

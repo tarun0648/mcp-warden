@@ -22,7 +22,9 @@ invert this stage.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -74,11 +76,16 @@ class InjectionClassifier:
         model_id: str = DEFAULT_MODEL,
         device: str = "auto",
         timeout_seconds: float = 2.0,
+        on_timing: Any | None = None,
     ) -> None:
         self.enabled = enabled
         self.model_id = model_id
         self.requested_device = device
         self.timeout_seconds = timeout_seconds
+        #: `on_timing(seconds)` after every inference, including a failed one. Wired to the
+        #: classifier histogram so "how long does the model take" is a measurement rather than
+        #: a claim.
+        self._on_timing = on_timing
         self._pipeline: Any | None = None
         self._load_error: str | None = None
         self._load_lock = threading.Lock()
@@ -158,6 +165,7 @@ class InjectionClassifier:
             return ClassifierResult(score=None, ran=False)
         if not text.strip():
             return ClassifierResult(score=0.0, ran=True)
+        started = time.perf_counter()
         try:
             async with asyncio.timeout(self.timeout_seconds):
                 score = await asyncio.to_thread(self._classify_blocking, text)
@@ -166,14 +174,28 @@ class InjectionClassifier:
                 "injection classifier timed out",
                 extra={"warden": {"timeout_seconds": self.timeout_seconds}},
             )
+            self._record_timing(started)
             return ClassifierResult(
                 score=None, error=f"timed out after {self.timeout_seconds:g}s", ran=True
             )
         except Exception as exc:
+            self._record_timing(started)
             return ClassifierResult(
                 score=None, error=f"{type(exc).__name__}: {exc}"[:200], ran=True
             )
+        self._record_timing(started)
         return ClassifierResult(score=score, ran=True)
+
+    def _record_timing(self, started: float) -> None:
+        """Report how long this inference took, including when it failed.
+
+        A timeout is the most interesting measurement of all, so it is recorded rather than
+        dropped - otherwise the histogram shows only the calls that were fast enough.
+        """
+        if self._on_timing is None:
+            return
+        with contextlib.suppress(Exception):
+            self._on_timing(time.perf_counter() - started)
 
     def _classify_blocking(self, text: str) -> float:
         pipe = self._load()

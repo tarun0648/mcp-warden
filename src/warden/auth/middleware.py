@@ -94,23 +94,43 @@ class AuthMiddleware:
         protected_prefixes: Sequence[str],
         resource_metadata_url: str,
         realm: str = "mcp-warden",
+        optional_prefixes: Sequence[str] = (),
     ) -> None:
         self.app = app
         self._authenticator = authenticator
         self._prefixes = tuple(protected_prefixes)
+        #: Paths where a credential is *verified if present* but not required. `/metrics` is
+        #: the case this exists for: a sidecar Prometheus scrapes from loopback with no
+        #: credential, while a remote scrape must present an admin one - and the endpoint can
+        #: only make that choice if the middleware has already verified whatever arrived.
+        self._optional_prefixes = tuple(optional_prefixes)
         self._resource_metadata_url = resource_metadata_url
         self._realm = realm
 
+    @staticmethod
+    def _matches(path: str, prefixes: Sequence[str]) -> bool:
+        return any(path == prefix or path.startswith(f"{prefix}/") for prefix in prefixes)
+
     def _is_protected(self, path: str) -> bool:
-        return any(path == prefix or path.startswith(f"{prefix}/") for prefix in self._prefixes)
+        return self._matches(path, self._prefixes)
+
+    def _is_optional(self, path: str) -> bool:
+        return self._matches(path, self._optional_prefixes)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or not self._is_protected(scope.get("path", "")):
+        path = scope.get("path", "")
+        if scope["type"] != "http" or not (self._is_protected(path) or self._is_optional(path)):
             await self.app(scope, receive, send)
             return
 
         credential = extract_bearer(scope.get("headers", []))
         if credential is None:
+            if self._is_optional(path):
+                # No credential on an optional path: carry on unauthenticated and let the
+                # endpoint decide. A *wrong* credential below is still a 401, because silently
+                # ignoring one would hide a misconfigured scraper.
+                await self.app(scope, receive, send)
+                return
             await self._unauthorized(scope, receive, send, "a Bearer credential is required")
             return
         try:

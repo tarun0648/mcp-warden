@@ -264,6 +264,9 @@ class Settings(BaseSettings):
     classifier_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
 
     metrics_enabled: bool = True
+    #: Allow an unauthenticated scrape from loopback, which is how a sidecar Prometheus
+    #: reaches /metrics. Any other client needs the admin role.
+    metrics_allow_localhost: bool = True
 
     #: Host headers the MCP endpoint accepts, comma separated. DNS-rebinding protection
     #: rejects anything else, which is what stops a web page from driving a local gateway.

@@ -13,6 +13,12 @@ setup: ## Create the venv, install all dependency groups, install pre-commit hoo
 	-$(RUN) pre-commit install
 
 up: ## Start postgres, redis and jaeger in the background
+	docker compose up -d --wait postgres redis jaeger
+
+up-observability: ## Also start prometheus and grafana (dashboard on http://localhost:3000)
+	docker compose up -d --wait prometheus grafana
+
+up-all: ## Start every backing service
 	docker compose up -d --wait
 
 down: ## Stop the backing services (keeps volumes)

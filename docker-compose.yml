@@ -36,6 +36,49 @@ services:
       timeout: 3s
       retries: 20
 
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    ports: ["9090:9090"]
+    volumes:
+      - ./deploy/prometheus:/etc/prometheus:ro
+      - warden_promdata:/prometheus
+    extra_hosts:
+      # So the container can scrape a gateway running on the Mac itself.
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  grafana:
+    image: grafana/grafana:11.5.1
+    environment:
+      # Local development only: the dashboard is read-only and carries no secrets, and a login
+      # prompt in front of a localhost dashboard is friction without security.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: light
+    ports: ["3000:3000"]
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - warden_grafanadata:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   warden_pgdata:
   warden_redisdata:
+  warden_promdata:
+  warden_grafanadata:

@@ -409,3 +409,41 @@ stronger measurement, and it reports both columns for the same reason.
   `require_approval: false` rule for a tool the role could already call never reached it, and
   the call sat waiting for a human. The fix was in the test; the engine's first-match rule is
   the documented behaviour.
+
+## Phase 10 — tracing and metrics
+
+- **The SDK's OTel middleware is used, not replaced.** It already emits the root SERVER span
+  with the current conventions (`mcp.method.name`, `gen_ai.operation.name`, `gen_ai.tool.name`)
+  and already injects W3C `traceparent` into outbound `_meta`. Writing a second root span would
+  have produced two spans per request with two sets of names for the same thing. The gateway adds
+  what only it knows: a span per pipeline stage, and the security decision.
+- **Span attributes are allowlisted, and the allowlist is enforced in one function.** Spans
+  leave the trust boundary the audit log sits inside and nothing downstream redacts them, so
+  `set_attributes` refuses anything not on the list and logs an error. The alternative — trusting
+  every call site — breaks the first time someone adds an attribute to debug something.
+- **`stage_span` is a no-op context manager when tracing is off**, which is the default. The
+  check is on the provider class rather than a config flag, so it stays right if a provider is
+  installed by something else.
+- **The test fixture restores the *raw* `_TRACER_PROVIDER`, not `get_tracer_provider()`.** That
+  accessor returns a proxy when nothing is set, and putting the proxy back into the slot it
+  proxies makes every later lookup recurse until the stack ends. It did, in two tests.
+- **`/metrics` is on an "optional authentication" list.** It was initially outside the auth
+  middleware entirely, which meant an admin credential sent to it was never verified and the
+  endpoint answered 403 to a valid admin key. The middleware now verifies a credential *if
+  present* on such paths and leaves the requirement to the endpoint — and a credential that is
+  present but wrong is still a 401, because silently ignoring one would hide a misconfigured
+  scraper.
+- **`tool` is a bounded label and `principal` is not a label.** An unknown tool name is recorded
+  as the literal `unknown`; otherwise a caller could create a time series per invented name,
+  which is a memory leak with a request interface. Per-caller numbers belong in the audit log.
+- **Gauges are sampled at scrape time.** `warden_quarantined_tools` and
+  `warden_pending_approvals` describe "right now", and keeping them in step from every code path
+  that might change them is how gauges drift. A failure to count pending approvals logs a
+  warning rather than failing the scrape.
+- **The gateway uses its own `CollectorRegistry`, not the global default.** Two gateways in one
+  test process would otherwise collide on metric names, and a test asserting that a counter
+  moved needs to know which gateway moved it.
+- **Grafana runs with anonymous viewer access in compose.** Local development only: the
+  dashboard is read-only, carries no secrets, and a login prompt in front of a localhost
+  dashboard is friction without security. Noted here so it is a decision rather than an
+  oversight.

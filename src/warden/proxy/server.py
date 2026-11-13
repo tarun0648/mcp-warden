@@ -19,6 +19,7 @@ from warden.logging import get_logger, principal_id_var, request_id_var
 from warden.pipeline import Pipeline, Principal, ProgressReporter, RequestContext
 from warden.proxy.registry import ToolRegistry
 from warden.proxy.stages import denial_result
+from warden.telemetry.tracing import record_outcome, request_span
 from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
@@ -89,7 +90,10 @@ def build_mcp_server(deps: GatewayDeps) -> Server[Any]:
         token = request_id_var.set(request.request_id)
         _bind_log_context(principal)
         try:
-            await deps.pipeline_factory().run(request)
+            with request_span("tools/call", params.name, request.request_id) as span:
+                await deps.pipeline_factory().run(request)
+                if span is not None:
+                    record_outcome(span, request)
         finally:
             request_id_var.reset(token)
         if request.stopped or request.result is None:

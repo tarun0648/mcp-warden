@@ -22,7 +22,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from warden.admin import AdminDeps, build_admin_routes, install_sighup_reload
+from warden.admin import AdminDeps, admin_principal, build_admin_routes, install_sighup_reload
 from warden.approval.stage import Approval
 from warden.approval.store import ApprovalStore
 from warden.approval.web import build_approval_routes
@@ -63,6 +63,8 @@ from warden.scan.definitions import DefinitionScanner
 from warden.scan.output import OutputScanner
 from warden.scan.pinning import PinStore
 from warden.scan.stages import ArgumentDLP, DefinitionIntegrity, OutputScan
+from warden.telemetry.metrics import Metrics
+from warden.telemetry.tracing import configure_tracing
 from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
@@ -70,10 +72,13 @@ logger = get_logger(__name__)
 REQUEST_ID_HEADER = "x-request-id"
 MCP_PATH = "/mcp"
 JWKS_PATH = "/.well-known/jwks.json"
+METRICS_PATH = "/metrics"
 PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
 #: Paths that require a credential. Public by design: the health checks (a load balancer has no
 #: credential) and the two well-known documents (a client must read them to get one).
 PROTECTED_PREFIXES = (MCP_PATH, "/admin")
+#: A credential here is verified if present and not required. See `AuthMiddleware`.
+OPTIONAL_AUTH_PREFIXES = (METRICS_PATH,)
 
 
 def default_readiness(settings: Settings) -> Readiness:
@@ -196,6 +201,50 @@ def make_protected_resource_metadata(
     return metadata
 
 
+def make_metrics(
+    metrics: Metrics,
+    *,
+    upstreams: UpstreamManager,
+    pins: PinStore,
+    approvals: ApprovalStore,
+    allow_localhost: bool,
+) -> Callable[[Request], Awaitable[Response]]:
+    """Serve Prometheus metrics, to localhost or to an admin.
+
+    Not public: the series names and label values describe which tools exist, which are
+    quarantined and what is being refused - useful to an operator and equally useful to someone
+    deciding what to attack. A scrape from loopback is allowed without a credential because
+    that is how a sidecar Prometheus reaches it; anything else needs the admin role.
+    """
+
+    async def endpoint(request: Request) -> Response:
+        client_host = request.client.host if request.client else ""
+        local = client_host in ("127.0.0.1", "::1", "localhost", "testclient")
+        if not (allow_localhost and local):
+            principal = admin_principal(request)
+            if principal is None:
+                return JSONResponse(
+                    {
+                        "error": "forbidden",
+                        "error_description": "metrics are available to localhost or the admin role",
+                    },
+                    status_code=403,
+                )
+
+        # Gauges describe "right now", so they are sampled at scrape time rather than kept in
+        # step by every code path that might change them.
+        metrics.set_upstream_health(upstreams.health())
+        metrics.set_quarantined(len(pins.quarantined_names))
+        try:
+            metrics.set_pending_approvals(len(await approvals.pending()))
+        except Exception:
+            logger.warning("could not count pending approvals for /metrics")
+        body, content_type = metrics.render()
+        return Response(body, media_type=content_type)
+
+    return endpoint
+
+
 def build_redis(settings: Settings) -> Any:
     """One Redis client for the whole process: the limiter and the revocation list share it."""
     import redis.asyncio as aioredis
@@ -228,6 +277,7 @@ def build_pipeline_factory(
     output_scanner: OutputScanner,
     approvals: ApprovalStore,
     approval_wait_seconds: float,
+    metrics: Metrics,
 ) -> Callable[[], Pipeline]:
     """The pipeline, in the one order that is the security contract.
 
@@ -260,6 +310,9 @@ def build_pipeline_factory(
     output_scan = OutputScan(output_scanner, servers_config)
     finish = audit_finish_hook(audit)
 
+    async def record_metrics(ctx: Any) -> None:
+        metrics.record_request(ctx, known_tools=registry)
+
     def factory() -> Pipeline:
         return Pipeline(
             [
@@ -275,7 +328,7 @@ def build_pipeline_factory(
                 output_limit,
                 output_scan,
             ],
-            [finish],
+            [finish, record_metrics],
         )
 
     return factory
@@ -330,6 +383,7 @@ def create_app(
     database: Database | None = None,
     redis: Any | None = None,
     injection_classifier: InjectionClassifier | None = None,
+    metrics: Metrics | None = None,
     revocations: RevocationStore | None = None,
     mount_mcp: bool = True,
     upstream_wait_seconds: float = 0.0,
@@ -363,6 +417,8 @@ def create_app(
     # close on shutdown.
     owned_redis = redis is None
     owned_database = database is None
+    # Built before the classifier, which reports its timings into it.
+    _shared_metrics = metrics if metrics is not None else Metrics()
     redis_client = redis if redis is not None else build_redis(settings)
     limiter = RateLimiter(redis_client, gateway.limits)
 
@@ -377,6 +433,7 @@ def create_app(
             model_id=gateway.scan.classifier_model,
             device=gateway.scan.classifier_device,
             timeout_seconds=gateway.scan.classifier_timeout_seconds,
+            on_timing=(metrics or _shared_metrics).observe_classifier,
         )
     )
     approvals = ApprovalStore(
@@ -388,6 +445,7 @@ def create_app(
     )
     pins = PinStore(db, DefinitionScanner(gateway.scan, classifier))
     output_scanner = OutputScanner(gateway.scan, classifier)
+    telemetry = metrics if metrics is not None else _shared_metrics
     trusted = [upstream.name for upstream in servers.upstreams if upstream.trusted]
 
     async def on_tools_changed(tools_by_upstream: Any) -> None:
@@ -428,6 +486,20 @@ def create_app(
     )
     routes.extend(build_approval_routes(approvals=approvals, api_keys=ApiKeyStore(db)))
     routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
+    if settings.metrics_enabled:
+        routes.append(
+            Route(
+                METRICS_PATH,
+                make_metrics(
+                    telemetry,
+                    upstreams=manager,
+                    pins=pins,
+                    approvals=approvals,
+                    allow_localhost=settings.metrics_allow_localhost,
+                ),
+                methods=["GET"],
+            )
+        )
     routes.append(
         Route(PROTECTED_RESOURCE_PATH, make_protected_resource_metadata(settings), methods=["GET"])
     )
@@ -455,6 +527,7 @@ def create_app(
                 output_scanner,
                 approvals,
                 gateway.approval.wait_seconds,
+                telemetry,
             ),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
             tool_filter=build_tool_filter(policies, pins),
@@ -487,6 +560,7 @@ def create_app(
             else:
                 # Deliberately not guarded: a gateway that cannot read which tools are
                 # quarantined must refuse to start rather than start without knowing.
+                configure_tracing(settings)
                 await pins.load_quarantine_view()
                 if classifier.enabled:
                     await classifier.warm_up()
@@ -509,6 +583,7 @@ def create_app(
         AuthMiddleware,
         authenticator=authenticator,
         protected_prefixes=PROTECTED_PREFIXES,
+        optional_prefixes=OPTIONAL_AUTH_PREFIXES,
         resource_metadata_url=(
             f"{settings.warden_resource_url.rsplit('/mcp', 1)[0]}{PROTECTED_RESOURCE_PATH}"
         ),
@@ -523,6 +598,7 @@ def create_app(
     app.state.limiter = limiter
     app.state.audit = audit
     app.state.pins = pins
+    app.state.metrics = telemetry
     app.state.approvals = approvals
     app.state.classifier = classifier
     app.state.redis = redis_client
@@ -538,6 +614,7 @@ def create_app(
 __all__ = [
     "JWKS_PATH",
     "MCP_PATH",
+    "OPTIONAL_AUTH_PREFIXES",
     "PROTECTED_PREFIXES",
     "PROTECTED_RESOURCE_PATH",
     "RequestIdMiddleware",
