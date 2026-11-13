@@ -81,11 +81,11 @@ async def test_base64_variant_decodes_to_the_plain_injection() -> None:
 async def test_rug_pull_flips_exactly_after_n_list_calls() -> None:
     state = EvilState(rugpull_after=2)
     async with evil_client(state) as (client, _state):
-        first = await client.list_tools(cache_mode="skip")
+        first = await client.list_tools(cache_mode="bypass")
         assert _quote_description(first) == BENIGN_QUOTE_DESCRIPTION
-        second = await client.list_tools(cache_mode="skip")
+        second = await client.list_tools(cache_mode="bypass")
         assert _quote_description(second) == BENIGN_QUOTE_DESCRIPTION
-        third = await client.list_tools(cache_mode="skip")
+        third = await client.list_tools(cache_mode="bypass")
         assert _quote_description(third) == RUGPULLED_QUOTE_DESCRIPTION
     assert state.list_calls == 3
 
@@ -94,7 +94,7 @@ async def test_rug_pull_can_be_disabled_with_a_large_threshold() -> None:
     state = EvilState(rugpull_after=100)
     async with evil_client(state) as (client, _state):
         for _ in range(4):
-            listing = await client.list_tools(cache_mode="skip")
+            listing = await client.list_tools(cache_mode="bypass")
             assert _quote_description(listing) == BENIGN_QUOTE_DESCRIPTION
 
 

@@ -27,7 +27,7 @@ def test_readyz_200_against_real_services() -> None:
             "redis": redis_check(settings.redis_url),
         }
     )
-    with TestClient(create_app(settings, readiness=readiness)) as client:
+    with TestClient(create_app(settings, readiness=readiness, mount_mcp=False)) as client:
         response = client.get("/readyz")
     assert response.status_code == 200, response.text
 
@@ -46,7 +46,7 @@ def test_readyz_503_when_a_service_is_not_listening() -> None:
         },
         timeout=2.0,
     )
-    with TestClient(create_app(settings, readiness=readiness)) as client:
+    with TestClient(create_app(settings, readiness=readiness, mount_mcp=False)) as client:
         response = client.get("/readyz")
     assert response.status_code == 503
     assert set(response.json()["unavailable"]) == {"postgres", "redis"}

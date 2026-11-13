@@ -219,6 +219,9 @@ class GatewayConfig(StrictModel):
     approval: ApprovalConfig = ApprovalConfig()
     upstream_connect_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     tools_refresh_seconds: float = Field(default=300.0, gt=0)
+    #: How often each connected upstream is pinged. A failed ping marks it down, so its
+    #: tools stop being advertised rather than being handed out and then failing.
+    upstream_health_interval_seconds: float = Field(default=5.0, gt=0, le=600)
 
 
 class Settings(BaseSettings):
@@ -252,6 +255,19 @@ class Settings(BaseSettings):
     classifier_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
 
     metrics_enabled: bool = True
+
+    #: Host headers the MCP endpoint accepts, comma separated. DNS-rebinding protection
+    #: rejects anything else, which is what stops a web page from driving a local gateway.
+    transport_allowed_hosts: str = "127.0.0.1:*,localhost:*,[::1]:*"
+    transport_allowed_origins: str = "http://127.0.0.1:*,http://localhost:*,http://[::1]:*"
+
+    @property
+    def allowed_hosts(self) -> list[str]:
+        return [part.strip() for part in self.transport_allowed_hosts.split(",") if part.strip()]
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        return [part.strip() for part in self.transport_allowed_origins.split(",") if part.strip()]
 
     @property
     def gateway_yaml(self) -> Path:

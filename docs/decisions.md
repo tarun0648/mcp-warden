@@ -74,3 +74,34 @@ One line per decision, with the reason. Newest last.
   be compared against a baseline.
 - **`huge_output` and `slow_tool` are capped.** A test asking for a gigabyte must not take the
   machine down with it; the cap is 4 MB and 30 seconds.
+
+## Phase 3 — proxy core
+
+- **The upstream liveness probe is `tools/list`, not `ping`.** `ping` was removed from the
+  protocol in 2026-07-28, so pinging a modern upstream answers "method not found" — the first
+  version of the health loop marked every healthy server down every five seconds. Re-listing is
+  the probe *and* the refresh, and a changed listing fires a callback, which is how a rug pull
+  gets noticed between calls rather than only on restart.
+- **`cache_mode="bypass"`, not `"skip"`.** The SDK's values are `use`, `refresh` and `bypass`;
+  `"skip"` type-checked as a string and silently did something undefined. The gateway's upstream
+  clients are also built with `cache=None`, because a cached tool listing would hide a rug pull.
+- **One owner task per upstream.** The SDK client is an anyio context manager, so it must be
+  entered and exited in the same task. The owner task enters it, publishes the session, holds and
+  probes it, then exits it; request handlers only use the published session, which is safe across
+  tasks. Each connection also has its own backoff and its own concurrency semaphore, so a slow
+  upstream cannot stall another.
+- **A stage that raises is a denial, not a 500.** `Pipeline.run` catches per stage and sets
+  `WARDEN_DENIED:internal`. A bug in a security stage must not become an allowed call.
+- **Finish hooks run in a `finally`, and a failing hook does not stop the others.** The audit
+  writer is a finish hook; "every request leaves a record" depends on this.
+- **Denials are `CallToolResult(isError=True)` with structured content**, not JSON-RPC errors.
+  The caller is usually a model, which needs a reason code it can act on. Only protocol-level
+  problems (bad credential, malformed request) use HTTP or JSON-RPC errors.
+- **An upstream's own exception text is logged, never returned.** It can carry a path, a query or
+  a connection string; the client gets `WARDEN_UPSTREAM_ERROR` and a request id.
+- **`warden tools` renders descriptions with invisible characters escaped as `<U+200B>`.**
+  Printing an untrusted description raw lets a poisoned tool hide text from the operator reading
+  the tool list, which is the attack itself.
+- **The app publishes its event loop on `app.state.loop`.** Upstream connections are owned by
+  tasks in that loop; anything outside it (a test, operational tooling) must schedule work with
+  `run_coroutine_threadsafe` instead of awaiting them directly.

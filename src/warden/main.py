@@ -1,26 +1,45 @@
 """The gateway's HTTP application factory.
 
-Phase 0 serves only /healthz and /readyz. Later phases mount the MCP endpoint at /mcp, the
-admin API under /admin and the approval UI at /approvals onto the same app.
+One Starlette app serves everything: `/mcp` (Streamable HTTP, the MCP endpoint clients talk to),
+`/healthz` and `/readyz`, and from later phases the JWKS document, the admin API and the
+approval UI. `create_app` wires the upstream manager, the tool registry and the request
+pipeline together and hands their lifetimes to the ASGI lifespan.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 
+from mcp.server.lowlevel.server import Server
+from mcp.server.streamable_http_manager import StreamableHTTPASGIApp, StreamableHTTPSessionManager
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
-from warden.config import Settings
+from warden.config import (
+    GatewayConfig,
+    ServersConfig,
+    Settings,
+    load_gateway_config,
+    load_servers_config,
+)
 from warden.health import Readiness, postgres_check, redis_check
 from warden.logging import configure_logging, get_logger, request_id_var
+from warden.pipeline import Pipeline
+from warden.proxy.registry import ToolRegistry
+from warden.proxy.server import GatewayDeps, build_mcp_server
+from warden.proxy.stages import ForwardToUpstream, ResolveTool
+from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
 
 REQUEST_ID_HEADER = "x-request-id"
+MCP_PATH = "/mcp"
 
 
 def default_readiness(settings: Settings) -> Readiness:
@@ -101,16 +120,125 @@ def _safe_request_id(value: str | None) -> str | None:
     return None
 
 
-def create_app(settings: Settings, *, readiness: Readiness | None = None) -> Starlette:
-    """Build the Starlette application for the given settings."""
+def build_upstream_manager(
+    gateway_config: GatewayConfig, servers_config: ServersConfig
+) -> UpstreamManager:
+    """An upstream manager configured from the gateway and servers files."""
+    return UpstreamManager(
+        servers_config,
+        connect_timeout=gateway_config.upstream_connect_timeout_seconds,
+        health_interval=gateway_config.upstream_health_interval_seconds,
+        refresh_interval=gateway_config.tools_refresh_seconds,
+    )
+
+
+def build_pipeline_factory(
+    registry: ToolRegistry, servers_config: ServersConfig, upstreams: UpstreamManager
+) -> Callable[[], Pipeline]:
+    """The Phase 3 pipeline: resolve the tool, then forward it.
+
+    Later phases insert Authenticate, DefinitionIntegrity, Policy, RateLimit, ArgumentDLP and
+    Approval before `forward`, and OutputScan after it. The order is the security contract, so
+    it lives in one place.
+    """
+    resolve = ResolveTool(registry, servers_config)
+    forward = ForwardToUpstream(upstreams)
+
+    def factory() -> Pipeline:
+        return Pipeline([resolve, forward])
+
+    return factory
+
+
+def create_app(
+    settings: Settings,
+    *,
+    readiness: Readiness | None = None,
+    gateway_config: GatewayConfig | None = None,
+    servers_config: ServersConfig | None = None,
+    upstreams: UpstreamManager | None = None,
+    mount_mcp: bool = True,
+    upstream_wait_seconds: float = 0.0,
+) -> Starlette:
+    """Build the Starlette application.
+
+    `mount_mcp=False` builds only the health endpoints, which is what the health unit tests
+    want: mounting MCP would start the upstream subprocesses.
+    """
     configure_logging(settings.log_level)
     checks = readiness if readiness is not None else default_readiness(settings)
-    routes = [
+    routes: list[Route] = [
         Route("/healthz", healthz, methods=["GET"]),
         Route("/readyz", make_readyz(checks), methods=["GET"]),
     ]
-    app = Starlette(routes=routes)
+
+    gateway = (
+        gateway_config if gateway_config is not None else load_gateway_config(settings.gateway_yaml)
+    )
+    servers = (
+        servers_config if servers_config is not None else load_servers_config(settings.servers_yaml)
+    )
+    registry = ToolRegistry()
+    manager = upstreams if upstreams is not None else build_upstream_manager(gateway, servers)
+    manager.on_tools_changed = registry.replace
+
+    mcp_server: Server[object] | None = None
+    session_manager: StreamableHTTPSessionManager | None = None
+
+    if mount_mcp:
+        deps = GatewayDeps(
+            settings_name="mcp-warden",
+            gateway_config=gateway,
+            servers_config=servers,
+            registry=registry,
+            upstreams=manager,
+            pipeline_factory=build_pipeline_factory(registry, servers, manager),
+        )
+        mcp_server = build_mcp_server(deps)
+        session_manager = StreamableHTTPSessionManager(
+            app=mcp_server,
+            json_response=False,
+            stateless=False,
+            security_settings=TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=settings.allowed_hosts,
+                allowed_origins=settings.allowed_origins,
+            ),
+        )
+        routes.append(Route(MCP_PATH, endpoint=StreamableHTTPASGIApp(session_manager)))
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_: Starlette) -> AsyncIterator[None]:
+        # Published so operational tooling (and tests) can schedule work on the loop that owns
+        # the upstream connections, rather than touching them from another loop.
+        app.state.loop = asyncio.get_running_loop()
+        if session_manager is None:
+            yield
+            return
+        async with session_manager.run():
+            await manager.start(wait_seconds=upstream_wait_seconds)
+            try:
+                yield
+            finally:
+                await manager.stop()
+
+    app = Starlette(routes=routes, lifespan=lifespan)
     app.add_middleware(RequestIdMiddleware)
     app.state.settings = settings
     app.state.readiness = checks
+    app.state.gateway_config = gateway
+    app.state.servers_config = servers
+    app.state.registry = registry
+    app.state.upstreams = manager
+    app.state.mcp_server = mcp_server
     return app
+
+
+__all__ = [
+    "MCP_PATH",
+    "RequestIdMiddleware",
+    "build_pipeline_factory",
+    "build_upstream_manager",
+    "create_app",
+    "default_readiness",
+]

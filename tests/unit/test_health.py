@@ -14,7 +14,7 @@ pytestmark = pytest.mark.unit
 
 def _app(settings: Settings, checks: dict[str, object]) -> TestClient:
     readiness = Readiness(checks)  # type: ignore[arg-type]
-    return TestClient(create_app(settings, readiness=readiness))
+    return TestClient(create_app(settings, readiness=readiness, mount_mcp=False))
 
 
 async def _ok() -> None:
@@ -68,7 +68,7 @@ def test_readyz_times_out_a_hanging_dependency(settings: Settings) -> None:
         await asyncio.sleep(5)
 
     readiness = Readiness({"postgres": hangs}, timeout=0.05)
-    with TestClient(create_app(settings, readiness=readiness)) as client:
+    with TestClient(create_app(settings, readiness=readiness, mount_mcp=False)) as client:
         response = client.get("/readyz")
     assert response.status_code == 503
     assert "timed out" in response.json()["checks"]["postgres"]

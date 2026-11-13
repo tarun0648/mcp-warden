@@ -14,9 +14,9 @@ the policy store, the limiter, the audit log or a scanner is unavailable, the ca
 | Phase | What it adds | State |
 | --- | --- | --- |
 | 0 | Scaffold, strict config, redaction, health checks, CI | done |
-| 1 | `notes_db` and `files` upstream MCP servers | not started |
-| 2 | `evil` malicious server for the red-team suite | not started |
-| 3 | Transparent MCP proxy and pipeline skeleton | not started |
+| 1 | `notes_db` and `files` upstream MCP servers | done |
+| 2 | `evil` malicious server for the red-team suite | done |
+| 3 | Transparent MCP proxy and pipeline skeleton | done |
 | 4 | API-key and ES256 JWT auth, JWKS, no token passthrough | not started |
 | 5 | Deny-by-default policy engine with argument constraints | not started |
 | 6 | Atomic rate limits, daily budgets, output size caps | not started |
