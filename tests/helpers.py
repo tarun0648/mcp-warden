@@ -238,6 +238,26 @@ def serve_app(
 TEST_ROLES = ("admin", "reader", "editor", "redteam")
 
 
+def repo_policies() -> Any:
+    """The policy file the gateway actually ships, so tests exercise the real rules."""
+    from warden.config import load_policies_config
+
+    return load_policies_config(REPO_ROOT / "config" / "policies.yaml")
+
+
+def policies_allowing(role: str, rule_id: str, tools: list[str], **rule_fields: Any) -> Any:
+    """The shipped policy plus one extra allow rule, for upstreams that exist only in a test."""
+    from warden.config import PolicyRule, RolePolicy
+
+    base = repo_policies()
+    existing = base.roles.get(role)
+    rule = PolicyRule(id=rule_id, effect="allow", tools=tools, **rule_fields)
+    rules = [*(existing.rules if existing else []), rule]
+    roles = dict(base.roles)
+    roles[role] = RolePolicy(rules=rules, description=existing.description if existing else None)
+    return base.model_copy(update={"roles": roles})
+
+
 def run_async(factory: Any) -> Any:
     """Run `factory()` on a fresh event loop in a worker thread.
 
@@ -297,6 +317,7 @@ def running_gateway(
     settings_overrides: dict[str, Any] | None = None,
     gateway_overrides: dict[str, Any] | None = None,
     servers_config: Any | None = None,
+    policies_config: Any | None = None,
     wait_upstreams: float = 40.0,
     **servers_kwargs: Any,
 ) -> Iterator[RunningGateway]:
@@ -305,6 +326,7 @@ def running_gateway(
     from warden.config import GatewayConfig
     from warden.health import Readiness
     from warden.main import create_app
+    from warden.policy.store import PolicyStore
 
     settings = test_settings(tmp_path, **(settings_overrides or {}))
     servers = (
@@ -314,11 +336,13 @@ def running_gateway(
     )
     keys = prepare_gateway_state(settings)
     gateway_config = GatewayConfig(**(gateway_overrides or {}))
+    store = PolicyStore.from_config(settings.policies_yaml, servers, policies_config)
     app = create_app(
         settings,
         readiness=Readiness({}),
         gateway_config=gateway_config,
         servers_config=servers,
+        policy_store=store,
         # Integration tests must not need a Redis daemon; revocation has its own unit tests
         # against fakeredis and its own Redis-marked integration test.
         revocations=NullRevocationStore(),

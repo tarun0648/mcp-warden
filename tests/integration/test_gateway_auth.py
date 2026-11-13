@@ -15,6 +15,7 @@ from tests.helpers import (
     header_recording_upstream,
     http_get,
     payload,
+    policies_allowing,
     running_gateway,
     stdio_upstream,
 )
@@ -156,7 +157,8 @@ async def test_the_client_credential_is_never_forwarded_to_an_upstream(tmp_path:
                 )
             ]
         )
-        with running_gateway(tmp_path, servers_config=servers) as gateway:
+        policies = policies_allowing("admin", "admin-recorder", ["recorder__*"])
+        with running_gateway(tmp_path, servers_config=servers, policies_config=policies) as gateway:
             client_credential = gateway.keys["admin"]
             async with gateway_client(gateway, gateway.auth("admin")) as client:
                 result = await client.call_tool("recorder__echo", {"text": "hello"})

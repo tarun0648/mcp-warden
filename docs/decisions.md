@@ -144,3 +144,38 @@ One line per decision, with the reason. Newest last.
 - **Test setup runs on its own loop in a worker thread.** A SQLAlchemy async engine binds its
   connections to the loop that creates them, and the gateway under test runs in a uvicorn
   thread; sharing one engine across both loops fails at the first query.
+
+## Phase 5 — policy engine
+
+- **A glob never crosses the `__` separator**, enforced by matching the server part and the tool
+  part separately. A pattern that names no server (`*`, `files`) is **rejected at config load**
+  rather than silently matching nothing: a policy author writing `*` means "everything", and
+  the safe answer is to tell them it is not allowed rather than to grant it or ignore it.
+- **A server name may not contain `__`.** Otherwise `a__b` as a server name makes
+  `split_namespaced` ambiguous and two different tools can resolve to one public name.
+- **A deny rule may not carry argument constraints, and that is a load-time error.** If a deny
+  could be conditional on an argument, the condition becomes the bypass: send the argument as
+  the wrong type, the constraint stops matching, the deny stops applying, and an allow rule
+  further down lets the call through.
+- **A constraint can only narrow.** A missing argument, a wrongly typed one, or a numeric string
+  where a number is expected all fail the constraint — so the allow rule does not apply. A
+  numeric string is refused deliberately: the upstream would parse it, and we would not.
+- **`regex` is a full match, never a search.** A search would let `../../etc/passwd` satisfy a
+  pattern written for `[a-z]+\.md`.
+- **`starts_with` compares normalised paths, segment by segment.** `notes/../secret` is checked
+  as `secret`, and a prefix of `notes` does not match `notesecret`.
+- **The shipped policy constrains file paths at the gateway, not only at the upstream.** Writing
+  the test table turned up that `files__write_file` accepted `../a.md`: the regex allowed dots
+  and slashes, so only the files server's sandbox stopped it. `starts_with: "."` normalises to
+  the root, which means "a relative path that does not climb out", and now the call is refused
+  before it is forwarded. Two independent layers, as the sandbox was always meant to be.
+- **`tools/list` hides a tool whose only matching rule is a deny.** A reader should not learn
+  that `files__delete_file` exists; argument constraints are ignored for listing, because a tool
+  callable with *some* arguments is a tool you can see.
+- **A rejected reload keeps the previous policy in force.** Falling back to an empty policy
+  would deny everything (a self-inflicted outage) and falling back to a default would be worse.
+  The rejection is logged at ERROR and the admin endpoint answers 409.
+- **The policy stage reads the engine from the store on every request**, so a reload takes
+  effect on the next call rather than the next restart.
+- **Authentication is not authorisation.** `/admin` is behind the auth middleware *and* an
+  explicit `admin` role check that answers 403 and logs the attempt.

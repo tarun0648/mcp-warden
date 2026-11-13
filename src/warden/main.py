@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 from mcp.server.lowlevel.server import Server
 from mcp.server.streamable_http_manager import StreamableHTTPASGIApp, StreamableHTTPSessionManager
@@ -21,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from warden.admin import AdminDeps, build_admin_routes, install_sighup_reload
 from warden.auth.api_keys import ApiKeyStore
 from warden.auth.jwt_keys import JwtKeyStore, KeyStoreError
 from warden.auth.middleware import Authenticator, AuthMiddleware, principal_from_request
@@ -42,7 +44,9 @@ from warden.config import (
 from warden.db.engine import Database
 from warden.health import Readiness, postgres_check, redis_check
 from warden.logging import configure_logging, get_logger, request_id_var
-from warden.pipeline import Pipeline
+from warden.pipeline import Pipeline, Principal
+from warden.policy.stage import Policy
+from warden.policy.store import PolicyStore
 from warden.proxy.registry import ToolRegistry
 from warden.proxy.server import GatewayDeps, build_mcp_server
 from warden.proxy.stages import ForwardToUpstream, ResolveTool
@@ -202,21 +206,40 @@ def build_upstream_manager(
 
 
 def build_pipeline_factory(
-    registry: ToolRegistry, servers_config: ServersConfig, upstreams: UpstreamManager
+    registry: ToolRegistry,
+    servers_config: ServersConfig,
+    upstreams: UpstreamManager,
+    policies: PolicyStore,
 ) -> Callable[[], Pipeline]:
     """The pipeline, in the one order that is the security contract.
 
-    Phase 4: authenticate, resolve, forward. Later phases insert DefinitionIntegrity, Policy,
-    RateLimit and ArgumentDLP and Approval before `forward`, and OutputScan after it.
+    Phase 5: authenticate, resolve, policy, forward. Later phases insert DefinitionIntegrity
+    before policy, then RateLimit, ArgumentDLP and Approval before `forward`, and OutputScan
+    after it.
     """
     authenticate = Authenticate()
     resolve = ResolveTool(registry, servers_config)
+    policy = Policy(policies)
     forward = ForwardToUpstream(upstreams)
 
     def factory() -> Pipeline:
-        return Pipeline([authenticate, resolve, forward])
+        return Pipeline([authenticate, resolve, policy, forward])
 
     return factory
+
+
+def build_tool_filter(policies: PolicyStore) -> Callable[..., list[Any]]:
+    """Filter `tools/list` down to what the caller could call.
+
+    Argument constraints are ignored for listing, but a tool whose only matching rule is a deny
+    is hidden entirely: a reader should not learn that `files__delete_file` exists.
+    """
+
+    def filter_tools(principal: Principal | None, tools: list[Any]) -> list[Any]:
+        allowed = set(policies.engine.visible_tools(principal, [tool.name for tool in tools]))
+        return [tool for tool in tools if tool.name in allowed]
+
+    return filter_tools
 
 
 def create_app(
@@ -226,6 +249,7 @@ def create_app(
     gateway_config: GatewayConfig | None = None,
     servers_config: ServersConfig | None = None,
     upstreams: UpstreamManager | None = None,
+    policy_store: PolicyStore | None = None,
     database: Database | None = None,
     revocations: RevocationStore | None = None,
     mount_mcp: bool = True,
@@ -253,6 +277,10 @@ def create_app(
     manager = upstreams if upstreams is not None else build_upstream_manager(gateway, servers)
     manager.on_tools_changed = registry.replace
 
+    policies = (
+        policy_store if policy_store is not None else PolicyStore(settings.policies_yaml, servers)
+    )
+
     db = database if database is not None else Database(settings.database_url)
     jwt_keys = JwtKeyStore(settings.jwt_key_dir)
     token_service = TokenService(
@@ -267,6 +295,7 @@ def create_app(
     )
     authenticator = Authenticator(api_keys=ApiKeyStore(db), tokens=token_service)
 
+    routes.extend(build_admin_routes(AdminDeps(policies=policies, upstreams=manager)))
     routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
     routes.append(
         Route(PROTECTED_RESOURCE_PATH, make_protected_resource_metadata(settings), methods=["GET"])
@@ -282,8 +311,9 @@ def create_app(
             servers_config=servers,
             registry=registry,
             upstreams=manager,
-            pipeline_factory=build_pipeline_factory(registry, servers, manager),
+            pipeline_factory=build_pipeline_factory(registry, servers, manager, policies),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
+            tool_filter=build_tool_filter(policies),
         )
         mcp_server = build_mcp_server(deps)
         session_manager = StreamableHTTPSessionManager(
@@ -303,15 +333,19 @@ def create_app(
         # Published so operational tooling (and tests) can schedule work on the loop that owns
         # the upstream connections, rather than touching them from another loop.
         app.state.loop = asyncio.get_running_loop()
-        if session_manager is None:
-            yield
-            return
-        async with session_manager.run():
-            await manager.start(wait_seconds=upstream_wait_seconds)
-            try:
+        remove_sighup = install_sighup_reload(policies)
+        try:
+            if session_manager is None:
                 yield
-            finally:
-                await manager.stop()
+                return
+            async with session_manager.run():
+                await manager.start(wait_seconds=upstream_wait_seconds)
+                try:
+                    yield
+                finally:
+                    await manager.stop()
+        finally:
+            remove_sighup()
 
     app = Starlette(routes=routes, lifespan=lifespan)
     # Starlette wraps in reverse order of addition, so the request-id middleware added last is
@@ -330,6 +364,7 @@ def create_app(
     app.state.jwt_keys = jwt_keys
     app.state.tokens = token_service
     app.state.authenticator = authenticator
+    app.state.policies = policies
     app.state.readiness = checks
     app.state.gateway_config = gateway
     app.state.servers_config = servers
@@ -346,6 +381,7 @@ __all__ = [
     "PROTECTED_RESOURCE_PATH",
     "RequestIdMiddleware",
     "build_pipeline_factory",
+    "build_tool_filter",
     "build_upstream_manager",
     "create_app",
     "default_readiness",

@@ -24,6 +24,9 @@ roles:
         constraints:
           path:
             max_length: 256
+            # Normalised before comparison, so "notes/../../etc/passwd" is rejected here and
+            # not only by the files server's own sandbox check.
+            starts_with: "."
       - id: reader-no-sql
         effect: deny
         tools: ["notes_db__run_sql"]
@@ -61,6 +64,7 @@ roles:
         constraints:
           path:
             max_length: 256
+            starts_with: "."
       - id: editor-files-write
         effect: allow
         tools: ["files__write_file"]
@@ -68,6 +72,7 @@ roles:
           path:
             max_length: 256
             regex: "[A-Za-z0-9._/-]{1,256}"
+            starts_with: "."
           content:
             max_length: 1000000
       - id: editor-files-delete
@@ -76,6 +81,7 @@ roles:
         constraints:
           path:
             max_length: 256
+            starts_with: "."
 
   admin:
     description: Everything the gateway exposes, plus the admin API and approvals UI.
@@ -86,6 +92,12 @@ roles:
       - id: admin-all-files
         effect: allow
         tools: ["files__*"]
+        constraints:
+          # Even an admin does not get to leave the sandbox through the gateway.
+          path:
+            max_length: 512
+            starts_with: "."
+            optional: true
 
   redteam:
     description: Used by the red-team suite. Allowed to reach the evil server on purpose.

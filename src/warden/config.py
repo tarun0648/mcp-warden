@@ -113,6 +113,10 @@ class UpstreamConfig(StrictModel):
     def _valid_name(cls, value: str) -> str:
         if not SERVER_NAME_RE.match(value):
             raise ValueError(f"must match {SERVER_NAME_RE.pattern}")
+        if NAMESPACE_SEP in value:
+            raise ValueError(
+                f"must not contain '{NAMESPACE_SEP}', which separates the server from the tool"
+            )
         return value
 
     @property
@@ -465,7 +469,32 @@ class PolicyRule(StrictModel):
                 raise ValueError(
                     f"tool pattern '{pattern}' may only contain name characters and globs"
                 )
+            # A pattern must name a server. Allowing a bare '*' would let one glob cross the
+            # '__' separator and silently grant every tool on every upstream.
+            server, separator, tool = pattern.partition(NAMESPACE_SEP)
+            if not separator or not server or not tool:
+                raise ValueError(
+                    f"tool pattern '{pattern}' must name a server and a tool, "
+                    f"for example 'files{NAMESPACE_SEP}*' - a glob never crosses "
+                    f"'{NAMESPACE_SEP}'"
+                )
         return value
+
+    @model_validator(mode="after")
+    def _deny_rules_have_no_constraints(self) -> Self:
+        """A deny rule applies on the tool name alone.
+
+        If a deny could be conditional on an argument, the condition becomes the bypass: pass an
+        argument of the wrong type, the constraint stops matching, the deny stops applying and an
+        allow rule further down lets the call through. Rejecting the combination at load time is
+        clearer than silently ignoring it.
+        """
+        if self.effect == "deny" and self.constraints:
+            raise ValueError(
+                "a deny rule must not have constraints: a deny applies to the tool, not to "
+                "particular arguments. Express the narrow case as an allow rule instead."
+            )
+        return self
 
 
 class RolePolicy(StrictModel):
