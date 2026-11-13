@@ -151,6 +151,23 @@ def test_servers_config(tmp_path: Path, *, include_evil: bool = False, **overrid
     return ServersConfig(upstreams=upstreams)
 
 
+def test_gateway_config(**overrides: Any) -> Any:
+    """The gateway config the project ships, with top-level keys replaced by `overrides`.
+
+    Loading the real file matters: tests that ran against `GatewayConfig()` defaults were
+    silently checking limits nobody deploys. The merge is shallow on purpose - passing
+    `limits=` replaces the whole limits block rather than merging into the shipped roles, which
+    is what a test tightening one bucket actually wants.
+    """
+    import yaml
+
+    from warden.config import GatewayConfig
+
+    raw = yaml.safe_load((REPO_ROOT / "config" / "gateway.yaml").read_text()) or {}
+    raw.update(overrides)
+    return GatewayConfig.model_validate(raw)
+
+
 def test_settings(tmp_path: Path, **overrides: Any) -> Any:
     """Settings for a gateway under test: temp database, temp keys, real config dir."""
     from warden.config import Settings
@@ -283,17 +300,22 @@ def run_async(factory: Any) -> Any:
     return outcome.get("value")
 
 
-def prepare_gateway_state(settings: Any) -> dict[str, str]:
+def prepare_gateway_state(settings: Any, *, mint_keys: bool = True) -> dict[str, str]:
     """Create the schema, the signing key, and one API key per test role.
 
     Returns the raw secrets by role. The engine used here is thrown away: the gateway builds
     its own inside the server thread's loop, where every connection it makes will live.
+
+    `mint_keys=False` skips every database touch, for tests that deliberately point the
+    gateway at an unreachable database and authenticate with a JWT instead.
     """
     from warden.auth.api_keys import ApiKeyStore
     from warden.auth.jwt_keys import JwtKeyStore
     from warden.db.engine import Database
 
     JwtKeyStore(settings.jwt_key_dir).initialise()
+    if not mint_keys:
+        return {}
 
     async def setup() -> dict[str, str]:
         database = Database(settings.database_url)
@@ -321,12 +343,12 @@ def running_gateway(
     servers_config: Any | None = None,
     policies_config: Any | None = None,
     redis: Any | None = None,
+    mint_keys: bool = True,
     wait_upstreams: float = 40.0,
     **servers_kwargs: Any,
 ) -> Iterator[RunningGateway]:
     """A fully wired gateway in front of real upstream subprocesses, with credentials minted."""
     from warden.auth.tokens import NullRevocationStore
-    from warden.config import GatewayConfig
     from warden.health import Readiness
     from warden.main import create_app
     from warden.policy.store import PolicyStore
@@ -337,8 +359,8 @@ def running_gateway(
         if servers_config is not None
         else test_servers_config(tmp_path, include_evil=include_evil, **servers_kwargs)
     )
-    keys = prepare_gateway_state(settings)
-    gateway_config = GatewayConfig(**(gateway_overrides or {}))
+    keys = prepare_gateway_state(settings, mint_keys=mint_keys)
+    gateway_config = test_gateway_config(**(gateway_overrides or {}))
     store = PolicyStore.from_config(settings.policies_yaml, servers, policies_config)
     # fakeredis keeps its state in process and works across event loops, so the gateway's
     # limiter runs the real Lua script without a Redis daemon. A Redis-marked integration test
@@ -489,3 +511,53 @@ async def gateway_client(
     else:
         async with Client(handle.mcp_url) as session:
             yield session
+
+
+def issue_token(handle: RunningGateway, user: str, roles: list[str], ttl: int = 300) -> str:
+    """A JWT signed by the running gateway's own key.
+
+    Useful where an API key will not do, because verifying one needs the database.
+    """
+    from warden.auth.jwt_keys import JwtKeyStore
+    from warden.auth.tokens import TokenConfig, TokenService
+
+    settings = handle.app.state.settings
+    service = TokenService(
+        JwtKeyStore(settings.jwt_key_dir),
+        TokenConfig(issuer=settings.jwt_issuer, audience=settings.jwt_audience),
+    )
+    return service.issue(user, roles, ttl_seconds=ttl).token
+
+
+def sqlite_path(url: str) -> str:
+    """The file a sqlite+aiosqlite URL points at."""
+    return url.split(":///", 1)[1]
+
+
+def audit_rows(url: str) -> list[dict[str, Any]]:
+    """Every audit row, read with a plain sqlite3 connection.
+
+    Deliberately not through the ORM: the tamper tests need the unrestricted access a
+    database superuser would have, which is exactly what this is.
+    """
+    import sqlite3
+
+    connection = sqlite3.connect(sqlite_path(url))
+    try:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute("SELECT * FROM audit_events ORDER BY id").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        connection.close()
+
+
+def tamper_sqlite(url: str, statement: str, parameters: tuple[Any, ...] = ()) -> None:
+    """Run arbitrary SQL against the audit table, as an attacker with database access would."""
+    import sqlite3
+
+    connection = sqlite3.connect(sqlite_path(url))
+    try:
+        connection.execute(statement, parameters)
+        connection.commit()
+    finally:
+        connection.close()

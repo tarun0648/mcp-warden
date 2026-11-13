@@ -8,17 +8,23 @@ credential must not reach an admin endpoint.
 from __future__ import annotations
 
 import contextlib
+import csv
+import io
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any, Final
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from warden.audit.log import DEFAULT_PAGE_SIZE, AuditFilters, AuditLog
 from warden.auth.middleware import principal_from_request
 from warden.logging import get_logger
 from warden.pipeline import Principal
 from warden.policy.store import PolicyStore
+from warden.ratelimit.limiter import RateLimiter
 from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
@@ -70,6 +76,8 @@ class AdminDeps:
 
     policies: PolicyStore
     upstreams: UpstreamManager
+    audit: AuditLog
+    limiter: RateLimiter
 
 
 def build_admin_routes(deps: AdminDeps) -> list[Route]:
@@ -105,12 +113,148 @@ def build_admin_routes(deps: AdminDeps) -> list[Route]:
             {"upstreams": [health.as_dict() for health in deps.upstreams.health().values()]}
         )
 
+    @require_admin
+    async def audit_query(request: Request) -> Response:
+        filters, problem = _audit_filters(request)
+        if problem is not None:
+            return JSONResponse(
+                {"error": "bad_request", "error_description": problem}, status_code=400
+            )
+        cursor, cursor_problem = _int_param(request, "cursor")
+        if cursor_problem is not None:
+            return JSONResponse(
+                {"error": "bad_request", "error_description": cursor_problem}, status_code=400
+            )
+        limit, limit_problem = _int_param(request, "limit")
+        if limit_problem is not None:
+            return JSONResponse(
+                {"error": "bad_request", "error_description": limit_problem}, status_code=400
+            )
+        page = await deps.audit.query(filters, cursor=cursor, limit=limit or DEFAULT_PAGE_SIZE)
+        if request.query_params.get("format") == "csv":
+            return _csv_response(page.rows)
+        return JSONResponse({"rows": page.rows, "next_cursor": page.next_cursor})
+
+    @require_admin
+    async def audit_verify(_: Request) -> Response:
+        result = await deps.audit.verify()
+        body: dict[str, Any] = {
+            "ok": result.ok,
+            "rows_checked": result.rows_checked,
+            "head_hash": result.head_hash,
+        }
+        if result.first_break is not None:
+            body["first_break"] = {
+                "row_id": result.first_break.row_id,
+                "kind": result.first_break.kind,
+                "detail": result.first_break.detail,
+            }
+        return JSONResponse(body, status_code=200 if result.ok else 409)
+
+    @require_admin
+    async def usage(request: Request) -> Response:
+        principal = request.query_params.get("user")
+        if not principal:
+            return JSONResponse(
+                {"error": "bad_request", "error_description": "a 'user' parameter is required"},
+                status_code=400,
+            )
+        return JSONResponse({"user": principal, "usage": await deps.limiter.usage(principal)})
+
     return [
         Route("/admin/reload", reload_policies, methods=["POST"]),
+        Route("/admin/audit", audit_query, methods=["GET"]),
+        Route("/admin/audit/verify", audit_verify, methods=["GET"]),
+        Route("/admin/usage", usage, methods=["GET"]),
         Route("/admin/policy", policy_status, methods=["GET"]),
         Route("/admin/upstreams", upstream_status, methods=["GET"]),
         Route("/admin/upstreams/refresh", refresh_tools, methods=["POST"]),
     ]
+
+
+#: Columns of the CSV export, in a fixed order so a saved spreadsheet keeps working.
+CSV_COLUMNS: Final = (
+    "id",
+    "ts",
+    "request_id",
+    "event",
+    "principal_id",
+    "auth_method",
+    "method",
+    "tool",
+    "upstream",
+    "risk",
+    "decision",
+    "reason_code",
+    "matched_rule",
+    "result_bytes",
+    "args_sha256",
+    "result_sha256",
+    "prev_hash",
+    "row_hash",
+)
+
+
+def _csv_response(rows: list[dict[str, Any]]) -> Response:
+    """Export rows as CSV.
+
+    `args_redacted`, `stage_timings_ms` and `scan_flags` are left out: they are nested JSON and
+    would need quoting rules that differ per spreadsheet. The JSON endpoint carries them.
+    """
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=list(CSV_COLUMNS), extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({column: row.get(column) for column in CSV_COLUMNS})
+    return Response(
+        buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="warden-audit.csv"'},
+    )
+
+
+def _audit_filters(request: Request) -> tuple[AuditFilters, str | None]:
+    """Build filters from the query string, rejecting an unparseable timestamp."""
+    params = request.query_params
+    since, since_problem = _timestamp_param(params.get("since"), "since")
+    if since_problem is not None:
+        return AuditFilters(), since_problem
+    until, until_problem = _timestamp_param(params.get("until"), "until")
+    if until_problem is not None:
+        return AuditFilters(), until_problem
+    return (
+        AuditFilters(
+            principal_id=params.get("user"),
+            tool=params.get("tool"),
+            decision=params.get("decision"),
+            event=params.get("event"),
+            reason_code=params.get("reason_code"),
+            request_id=params.get("request_id"),
+            since=since,
+            until=until,
+        ),
+        None,
+    )
+
+
+def _timestamp_param(raw: str | None, name: str) -> tuple[datetime | None, str | None]:
+    if not raw:
+        return None, None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None, f"'{name}' must be an ISO-8601 timestamp, for example 2026-11-13T00:00:00Z"
+    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)), None
+
+
+def _int_param(request: Request, name: str) -> tuple[int | None, str | None]:
+    raw = request.query_params.get(name)
+    if not raw:
+        return None, None
+    try:
+        return int(raw), None
+    except ValueError:
+        return None, f"'{name}' must be an integer"
 
 
 def install_sighup_reload(policies: PolicyStore) -> Callable[[], None]:
@@ -146,6 +290,7 @@ def install_sighup_reload(policies: PolicyStore) -> Callable[[], None]:
 
 __all__ = [
     "ADMIN_ROLE",
+    "CSV_COLUMNS",
     "AdminDeps",
     "admin_principal",
     "build_admin_routes",

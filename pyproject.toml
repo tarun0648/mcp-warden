@@ -84,6 +84,10 @@ ignore = ["S101", "S311", "B008", "RUF012", "N818", "ASYNC109"]
 # bypass the MCP client and observe the HTTP or process layer directly.
 "tests/**" = ["S", "E501", "ASYNC210", "ASYNC221"]
 "servers/evil/**" = ["S", "E501"]
+# S608: DDL cannot parameterise an identifier, so GRANT/CREATE ROLE statements are built
+# from module constants. No request data reaches them.
+"migrations/**" = ["S608"]
+"src/warden/audit/harden.py" = ["S608"]
 "redteam/**" = ["S"]
 "bench/**" = ["S"]
 

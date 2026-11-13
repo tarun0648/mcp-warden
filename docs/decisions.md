@@ -212,3 +212,50 @@ One line per decision, with the reason. Newest last.
 - **Tests assert on log output with a handler attached to the specific logger, not `caplog`.**
   The gateway's `configure_logging` replaces the root handlers, so whether caplog's handler is
   still attached depends on test order.
+
+## Phase 7 — tamper-evident audit log
+
+- **The write-ahead row is the last stage before `forward`.** Everything that can refuse a call
+  cheaply has already run, so the log is not filled with rows for calls that were never going to
+  happen; and nothing that can reach an upstream runs before it.
+- **`started` is written before the upstream is reached, and a failure to write it is a denial.**
+  A gateway whose log is down must stop acting rather than keep acting unobserved. The closing
+  row is best effort by contrast: by then the upstream has already run or been refused, so
+  failing the request would change nothing and would hand the caller an error it cannot act on.
+  A `started` row with no `finished` row is itself the evidence.
+- **A call denied *after* forwarding is recorded as `finished`, not `denied`.** On a timeout the
+  upstream may well have acted; a row saying "denied" would be a false statement about the world.
+- **`row_hash` excludes `id`.** The database assigns it, so including it would make a row's hash
+  depend on a sequence value that a restore or a burnt sequence number can change without anyone
+  tampering. `prev_hash` is what orders the chain.
+- **A test asserts that editing *any* hashed field changes the hash**, by mutating each field in
+  turn. That is what stops a future field being added to the table but not to the hash.
+- **Truncating the tail of the chain is not detectable from the chain alone**, and there is a
+  test that says so. `warden audit verify` prints the head hash for exactly this reason; pinning
+  it outside the gateway is the missing half, and it is listed as a known gap rather than
+  implied to be solved.
+- **Appends are serialised twice over**: an in-process `asyncio.Lock` and, on Postgres,
+  `pg_advisory_xact_lock`. Two `AuditLog` instances standing in for two gateway processes have
+  their own locks, so only the database-level one can keep them in step — tested with 50
+  interleaved appends from two writers.
+- **The migration never creates a role.** Creating one needs `CREATEROLE`, which a migration
+  role usually does not have and should not need; `REVOKE ALL ... FROM PUBLIC` does run there,
+  because leaving a PUBLIC grant undoes every other restriction. `warden db harden` does the
+  privileged half, and `warden audit privileges <role>` reads back what Postgres actually
+  permits. A test proves a non-owner member gets `permission denied` on UPDATE and DELETE.
+- **`harden` validates its `--grant-to` argument before any side effect.** The first version
+  quoted the identifier at the point of use, which meant a bad name left a half-applied state.
+- **`Database.create_all()` imports the models itself.** A table only joins `Base.metadata` when
+  its module has been imported, so a caller that had not happened to import `warden.db.models`
+  got an empty metadata and a silent no-op — which is how a Postgres test ended up querying a
+  table nothing had created.
+- **Alembic's `Config` is constructed with an explicit `stdout`.** It binds `sys.stdout` as a
+  *default argument*, so it captures whatever stdout existed at import time: the wrong stream
+  after any redirect, and a closed one under a CLI test runner.
+- **`warden token create` prints with `soft_wrap`.** rich otherwise breaks a long token across
+  lines, and what the operator copies is then not a token.
+- **The test harness loads the shipped `gateway.yaml`.** It previously used `GatewayConfig()`
+  defaults, so integration tests were checking limits nobody deploys — which is how a
+  "100 concurrent calls" test quietly became a "30 concurrent calls" test.
+- **The CSV export leaves out the nested JSON columns.** Quoting rules for embedded JSON differ
+  per spreadsheet; the JSON endpoint carries them faithfully instead.

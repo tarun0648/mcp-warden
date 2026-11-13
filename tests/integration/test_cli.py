@@ -1,0 +1,284 @@
+"""The `warden` command line, driven through typer's runner.
+
+Marked integration rather than unit because these commands open databases and spawn upstream
+subprocesses, exactly as an operator's invocation would.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+from typer.testing import CliRunner
+
+from warden.cli import app
+
+pytestmark = pytest.mark.integration
+
+runner = CliRunner()
+
+
+@pytest.fixture
+def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """Point every command at a temporary database, key directory and config directory."""
+    repo_config = Path(__file__).resolve().parents[2] / "config"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'warden.sqlite3'}")
+    monkeypatch.setenv("JWT_KEY_DIR", str(tmp_path / "keys"))
+    monkeypatch.setenv("CONFIG_DIR", str(repo_config))
+    monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:6379/15")
+    # rich wraps its tables to the terminal width; a wide one keeps assertions about cell
+    # contents honest instead of testing where the line happened to break.
+    monkeypatch.setenv("COLUMNS", "220")
+    yield tmp_path
+
+
+def invoke(*args: str) -> tuple[int, str]:
+    result = runner.invoke(app, list(args))
+    output = result.stdout
+    if result.exception is not None and result.exit_code != 0 and not output:
+        output = repr(result.exception)
+    return result.exit_code, output
+
+
+# -- configuration -----------------------------------------------------------------------------
+
+
+def test_check_config_accepts_the_shipped_files(cli_env: Path) -> None:
+    code, output = invoke("check-config")
+    assert code == 0, output
+    assert "all three configuration files are valid" in output
+    assert "notes_db" in output
+
+
+def test_check_config_reports_a_broken_file(cli_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    broken = cli_env / "config"
+    broken.mkdir()
+    (broken / "gateway.yaml").write_text("limits: {max_result_bytes: not-a-number}\n")
+    (broken / "servers.yaml").write_text("upstreams: []\n")
+    (broken / "policies.yaml").write_text("roles: {}\n")
+    monkeypatch.setenv("CONFIG_DIR", str(broken))
+    code, output = invoke("check-config")
+    assert code == 2
+    assert "gateway.yaml" in output
+    assert "max_result_bytes" in output
+
+
+# -- database ----------------------------------------------------------------------------------
+
+
+def test_db_upgrade_then_current(cli_env: Path) -> None:
+    code, output = invoke("db", "upgrade")
+    assert code == 0, output
+    assert "database is at head" in output
+    code, _ = invoke("db", "current")
+    assert code == 0
+
+
+def test_db_harden_says_so_on_sqlite(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    code, output = invoke("db", "harden")
+    assert code == 0, output
+    assert "not Postgres" in output
+
+
+# -- API keys ----------------------------------------------------------------------------------
+
+
+def extract_key(output: str) -> str:
+    match = re.search(r"(wdn_[A-Za-z0-9_-]{32})", output)
+    assert match is not None, f"no key in output:\n{output}"
+    return match.group(1)
+
+
+def test_key_lifecycle(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+
+    code, created = invoke("keys", "create", "--user", "alice", "--roles", "reader,editor")
+    assert code == 0, created
+    secret = extract_key(created)
+    assert "only time it is shown" in created
+
+    code, listed = invoke("keys", "list")
+    assert code == 0
+    assert "alice" in listed
+    assert secret not in listed, "listing must never reprint the secret"
+
+    code, revoked = invoke("keys", "revoke", secret[len("wdn_") :][:8])
+    assert code == 0, revoked
+    assert "revoked 1 key" in revoked
+
+    code, again = invoke("keys", "revoke", secret[len("wdn_") :][:8])
+    assert code == 1
+    assert "no active key" in again
+
+
+def test_keys_create_requires_a_role(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    code, output = invoke("keys", "create", "--user", "alice", "--roles", " , ")
+    assert code == 2
+    assert "at least one role" in output
+
+
+def test_keys_list_can_hide_revoked(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    _, created = invoke("keys", "create", "--user", "bob", "--roles", "reader")
+    prefix = extract_key(created)[len("wdn_") :][:8]
+    invoke("keys", "revoke", prefix)
+    code, output = invoke("keys", "list", "--active-only")
+    assert code == 0
+    assert "bob" not in output
+
+
+# -- JWT ---------------------------------------------------------------------------------------
+
+
+def test_jwt_init_rotate_and_jwks(cli_env: Path) -> None:
+    code, output = invoke("keys", "init-jwt")
+    assert code == 0, output
+    assert "active signing key" in output
+
+    code, jwks = invoke("keys", "jwks")
+    assert code == 0
+    document = json.loads(jwks)
+    assert len(document["keys"]) == 1
+    assert document["keys"][0]["alg"] == "ES256"
+    assert "PRIVATE" not in jwks
+
+    code, rotated = invoke("keys", "rotate-jwt")
+    assert code == 0, rotated
+    assert "new signing key" in rotated
+    assert len(json.loads(invoke("keys", "jwks")[1])["keys"]) == 2
+
+
+def test_token_create_needs_a_signing_key_first(cli_env: Path) -> None:
+    code, output = invoke("token", "create", "--user", "alice", "--roles", "editor")
+    assert code == 2
+    assert "init-jwt" in output
+
+
+def test_token_create_issues_a_verifiable_token(cli_env: Path) -> None:
+    invoke("keys", "init-jwt")
+    code, output = invoke("token", "create", "--user", "alice", "--roles", "editor", "--ttl", "60")
+    assert code == 0, output
+    token = next(
+        line.strip()
+        for line in output.splitlines()
+        if line.count(".") == 2 and line.strip().startswith("eyJ")
+    )
+    header = json.loads(_b64url_decode(token.split(".")[0]))
+    assert header["alg"] == "ES256"
+    assert "jti=" in output
+
+
+def test_token_create_requires_a_role(cli_env: Path) -> None:
+    invoke("keys", "init-jwt")
+    code, output = invoke("token", "create", "--user", "alice", "--roles", "")
+    assert code == 2
+    assert "at least one role" in output
+
+
+def _b64url_decode(segment: str) -> bytes:
+    import base64
+
+    padding = "=" * (-len(segment) % 4)
+    return base64.urlsafe_b64decode(segment + padding)
+
+
+# -- audit -------------------------------------------------------------------------------------
+
+
+def test_audit_verify_on_an_empty_log(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    code, output = invoke("audit", "verify")
+    assert code == 0, output
+    assert "OK" in output
+    assert "0 rows verified" in output
+    assert "head hash" in output
+
+
+def test_audit_verify_detects_tampering_and_exits_non_zero(cli_env: Path) -> None:
+    import sqlite3
+
+    from tests.helpers import run_async
+
+    invoke("db", "upgrade")
+
+    async def write_rows() -> None:
+        from warden.audit.log import AuditLog
+        from warden.db.engine import Database
+
+        database = Database(f"sqlite+aiosqlite:///{cli_env / 'warden.sqlite3'}")
+        try:
+            audit = AuditLog(database)
+            for index in range(4):
+                await audit.append(
+                    request_id=f"req{index}",
+                    event="finished",
+                    principal_id="alice",
+                    auth_method="api_key",
+                    method="tools/call",
+                    tool="files__read_file",
+                    upstream="files",
+                    risk="read",
+                    args_redacted={},
+                    args_sha256="0" * 64,
+                    decision="allow",
+                    reason_code="WARDEN_ALLOWED",
+                    stage_timings_ms={},
+                    result_bytes=0,
+                    scan_flags={},
+                )
+        finally:
+            await database.dispose()
+
+    run_async(write_rows)
+
+    code, output = invoke("audit", "verify")
+    assert code == 0, output
+    assert "4 rows verified" in output
+
+    connection = sqlite3.connect(str(cli_env / "warden.sqlite3"))
+    try:
+        connection.execute("UPDATE audit_events SET tool = 'files__delete_file' WHERE id = 2")
+        connection.commit()
+    finally:
+        connection.close()
+
+    code, output = invoke("audit", "verify")
+    assert code == 1
+    assert "BROKEN" in output
+    assert "row 2" in output
+
+    code, tailed = invoke("audit", "tail", "--limit", "5")
+    assert code == 0
+    assert "files__read_file" in tailed or "files__delete_file" in tailed
+
+
+def test_audit_tail_filters(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    code, output = invoke("audit", "tail", "--user", "nobody")
+    assert code == 0, output
+    assert "audit events" in output
+
+
+def test_audit_privileges_on_sqlite_says_it_does_not_apply(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    code, output = invoke("audit", "privileges", "warden")
+    assert code == 0, output
+    assert "no table privileges" in output
+
+
+# -- tools -------------------------------------------------------------------------------------
+
+
+def test_tools_lists_the_aggregated_tools(cli_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Spawns the real upstream subprocesses, as `warden tools` does for an operator."""
+    monkeypatch.setenv("NOTES_DB_PATH", str(cli_env / "notes.sqlite3"))
+    monkeypatch.setenv("FILES_SANDBOX_ROOT", str(cli_env / "sandbox"))
+    code, output = invoke("tools", "--wait", "45")
+    assert code == 0, output
+    assert "notes_db__list_notes" in output.replace("\n", "").replace(" ", "")
+    assert "upstream health" in output

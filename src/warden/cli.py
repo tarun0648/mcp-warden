@@ -192,10 +192,16 @@ app.add_typer(db_app, name="db")
 
 
 def _alembic_config() -> Any:
+    """Alembic's config, pointed at this repo's migrations.
+
+    `stdout` is passed explicitly because `alembic.config.Config` binds `sys.stdout` as a
+    *default argument*, so it captures whatever stdout was at import time - which is the wrong
+    stream once anything has redirected it, and a closed one under a CLI test runner.
+    """
     from alembic.config import Config
 
     root = Path(__file__).resolve().parents[2]
-    config = Config(str(root / "alembic.ini"))
+    config = Config(str(root / "alembic.ini"), stdout=sys.stdout)
     config.set_main_option("script_location", str(root / "migrations"))
     return config
 
@@ -255,7 +261,7 @@ def keys_create(
         raise typer.Exit(code=2)
     generated = asyncio.run(_create_key(user, role_list, label))
     console.print("[green]key created.[/green] This is the only time it is shown:")
-    console.print(f"\n  [bold]{generated.secret}[/bold]\n")
+    console.print(f"\n  [bold]{generated.secret}[/bold]\n", soft_wrap=True)
     console.print(f"  prefix: {generated.prefix}   user: {user}   roles: {', '.join(role_list)}")
     console.print("Store it in a password manager or a secret store. Never commit it.")
 
@@ -377,10 +383,142 @@ def token_create(
     except KeyStoreError as exc:
         console.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(code=2) from exc
-    console.print(issued.token)
+    # soft_wrap, because rich otherwise breaks a long token across lines and what the
+    # operator copies is then not a token.
+    console.print(issued.token, soft_wrap=True)
     console.print(
         f"[dim]jti={issued.jti} expires_at={issued.expires_at} aud={settings.jwt_audience}[/dim]"
     )
+
+
+@db_app.command("harden")
+def db_harden(
+    grant_to: Annotated[
+        str | None,
+        typer.Option(help="Also make this login role a member of the gateway role."),
+    ] = None,
+) -> None:
+    """Make audit_events append-only: SELECT + INSERT only, no UPDATE or DELETE.
+
+    Needs a role with CREATEROLE, so it is separate from `warden db upgrade`.
+    """
+    from warden.audit.harden import harden_audit_table
+
+    async def run() -> Any:
+        database = _database()
+        try:
+            return await harden_audit_table(database, grant_to=grant_to)
+        finally:
+            await database.dispose()
+
+    outcome = asyncio.run(run())
+    style = "green" if outcome.applied else "yellow"
+    console.print(f"[{style}]{'ok' if outcome.applied else 'skipped'}[/{style}] {outcome.message}")
+
+
+# ----------------------------------------------------------------------------------------------
+# Audit log
+# ----------------------------------------------------------------------------------------------
+
+audit_app = typer.Typer(help="The tamper-evident audit log.", no_args_is_help=True)
+app.add_typer(audit_app, name="audit")
+
+
+@audit_app.command("verify")
+def audit_verify() -> None:
+    """Walk the hash chain and report the first row that does not add up."""
+    from warden.audit.log import AuditLog
+
+    async def run() -> Any:
+        database = _database()
+        try:
+            return await AuditLog(database).verify()
+        finally:
+            await database.dispose()
+
+    result = asyncio.run(run())
+    if result.ok:
+        console.print(f"[green]OK[/green] {result.rows_checked} rows verified")
+        console.print(f"  head hash: {result.head_hash}")
+        console.print(
+            "  Pin that hash somewhere the gateway cannot write to detect a wholesale rebuild."
+        )
+        return
+    console.print(f"[red]BROKEN[/red] after {result.rows_checked} verified rows")
+    console.print(f"  {result.first_break}")
+    raise typer.Exit(code=1)
+
+
+@audit_app.command("tail")
+def audit_tail(
+    limit: Annotated[int, typer.Option(help="How many rows to show.")] = 20,
+    user: Annotated[str | None, typer.Option(help="Filter by principal id.")] = None,
+    tool: Annotated[str | None, typer.Option(help="Filter by namespaced tool name.")] = None,
+    decision: Annotated[str | None, typer.Option(help="allow | deny | pending.")] = None,
+    request_id: Annotated[str | None, typer.Option(help="Show one request's rows.")] = None,
+) -> None:
+    """Show the most recent audit rows."""
+    from warden.audit.log import AuditFilters, AuditLog
+
+    async def run() -> Any:
+        database = _database()
+        try:
+            return await AuditLog(database).query(
+                AuditFilters(
+                    principal_id=user, tool=tool, decision=decision, request_id=request_id
+                ),
+                limit=limit,
+            )
+        finally:
+            await database.dispose()
+
+    page = asyncio.run(run())
+    table = Table(title="audit events (newest first)")
+    for column in ("id", "ts", "event", "user", "tool", "decision", "reason", "rule"):
+        table.add_column(column, overflow="fold")
+    for row in page.rows:
+        table.add_row(
+            str(row["id"]),
+            row["ts"][:19],
+            row["event"],
+            row["principal_id"] or "-",
+            row["tool"] or "-",
+            row["decision"],
+            row["reason_code"],
+            row["matched_rule"] or "-",
+        )
+    console.print(table)
+    if page.next_cursor is not None:
+        console.print(f"[dim]more rows available; next cursor {page.next_cursor}[/dim]")
+
+
+@audit_app.command("privileges")
+def audit_privileges_command(
+    role: Annotated[str, typer.Argument(help="The role to inspect.")],
+) -> None:
+    """Print the privileges a role actually holds on audit_events, straight from Postgres."""
+    from warden.audit.harden import audit_privileges
+
+    async def run() -> Any:
+        database = _database()
+        try:
+            return await audit_privileges(database, role)
+        finally:
+            await database.dispose()
+
+    privileges = asyncio.run(run())
+    if not privileges:
+        console.print("[yellow]not Postgres: there are no table privileges to report[/yellow]")
+        return
+    table = Table(title=f"audit_events privileges for {role}")
+    table.add_column("privilege")
+    table.add_column("granted")
+    for name, granted in privileges.items():
+        expected_absent = name in ("UPDATE", "DELETE", "TRUNCATE")
+        mark = "yes" if granted else "no"
+        style = "red" if (granted and expected_absent) else "green"
+        table.add_row(name, f"[{style}]{mark}[/{style}]")
+    console.print(table)
 
 
 def main() -> None:

@@ -9,6 +9,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -31,17 +32,22 @@ AUDIT_CHAIN_LOCK_KEY = 0x7761_7264_656E_0001
 class Database:
     """An async engine plus a session factory, with the dialect differences in one place."""
 
-    def __init__(self, url: str, *, echo: bool = False) -> None:
+    def __init__(
+        self, url: str, *, echo: bool = False, connect_args: dict[str, Any] | None = None
+    ) -> None:
         self.url = url
         if url.startswith("sqlite"):
             _ensure_sqlite_directory(url)
+        # SQLite's default isolation makes concurrent writers fail with "database is locked";
+        # WAL plus a busy timeout is applied per connection in `prepare`.
+        defaults: dict[str, Any] = {"timeout": 30} if url.startswith("sqlite") else {}
+        # `connect_args` is how a deployment pins a Postgres search_path or statement timeout:
+        # asyncpg takes those as `server_settings`, not as URL parameters.
         self.engine: AsyncEngine = create_async_engine(
             url,
             echo=echo,
             pool_pre_ping=True,
-            # SQLite's default isolation makes concurrent writers fail with "database is
-            # locked"; WAL plus a busy timeout is set per connection in `_prepare_sqlite`.
-            connect_args={"timeout": 30} if url.startswith("sqlite") else {},
+            connect_args={**defaults, **(connect_args or {})},
         )
         self.session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             self.engine, expire_on_commit=False
@@ -68,12 +74,20 @@ class Database:
 
         Used by tests and by a first local run. Deployments use Alembic; a drift test asserts
         that the Alembic head and this metadata agree.
+
+        The models are imported here rather than left to the caller: a table only joins
+        `Base.metadata` when its module has been imported, so without this a caller that had
+        not happened to import `warden.db.models` got an empty metadata and a silent no-op.
         """
+        import warden.db.models  # noqa: F401  (importing registers every table)
+
         await self.prepare()
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
     async def drop_all(self) -> None:
+        import warden.db.models  # noqa: F401  (importing registers every table)
+
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 

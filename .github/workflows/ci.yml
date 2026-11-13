@@ -55,7 +55,17 @@ jobs:
           enable-cache: true
       - run: uv python install 3.12
       - run: uv sync --all-groups
-      - run: uv run pytest -m integration -q
+      # The coverage gate lives on the integration job because that is the one with real
+      # Postgres and Redis, so it measures the paths that actually ship.
+      - run: >-
+          uv run pytest -m "unit or integration" -q
+          --cov=src/warden --cov-report=term-missing --cov-report=xml
+          --cov-fail-under=85
         env:
           DATABASE_URL: postgresql+asyncpg://warden:warden_dev_password_change_me@localhost:5432/warden
           REDIS_URL: redis://localhost:6379/0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml

@@ -23,6 +23,8 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from warden.admin import AdminDeps, build_admin_routes, install_sighup_reload
+from warden.audit.log import AuditLog
+from warden.audit.stage import AuditWriteAhead, audit_finish_hook
 from warden.auth.api_keys import ApiKeyStore
 from warden.auth.jwt_keys import JwtKeyStore, KeyStoreError
 from warden.auth.middleware import Authenticator, AuthMiddleware, principal_from_request
@@ -211,22 +213,33 @@ def build_pipeline_factory(
     policies: PolicyStore,
     limiter: RateLimiter,
     limits: LimitsConfig,
+    audit: AuditLog,
 ) -> Callable[[], Pipeline]:
     """The pipeline, in the one order that is the security contract.
 
-    Phase 6: authenticate, resolve, policy, ratelimit, forward, output_limit. Later phases
-    insert DefinitionIntegrity before policy, ArgumentDLP and Approval before `forward`, and
-    OutputScan after `output_limit`.
+    Phase 7: authenticate, resolve, policy, ratelimit, audit (write-ahead), forward,
+    output_limit - with the audit writer as a finish hook so every request leaves a record
+    whatever happens. Later phases insert DefinitionIntegrity before policy, and ArgumentDLP
+    and Approval between ratelimit and audit, and OutputScan after output_limit.
+
+    The write-ahead row is the last thing before `forward` on purpose: everything that can
+    refuse the call cheaply has already run, so the log is not filled with rows for calls that
+    were never going to happen, and nothing that *can* reach an upstream runs before it.
     """
     authenticate = Authenticate()
     resolve = ResolveTool(registry, servers_config)
     policy = Policy(policies)
     ratelimit = RateLimit(limiter, limits)
+    write_ahead = AuditWriteAhead(audit)
     forward = ForwardToUpstream(upstreams)
     output_limit = OutputLimit(limits)
+    finish = audit_finish_hook(audit)
 
     def factory() -> Pipeline:
-        return Pipeline([authenticate, resolve, policy, ratelimit, forward, output_limit])
+        return Pipeline(
+            [authenticate, resolve, policy, ratelimit, write_ahead, forward, output_limit],
+            [finish],
+        )
 
     return factory
 
@@ -243,6 +256,23 @@ def build_tool_filter(policies: PolicyStore) -> Callable[..., list[Any]]:
         return [tool for tool in tools if tool.name in allowed]
 
     return filter_tools
+
+
+async def _close_owned(db: Database | None, redis_client: Any | None) -> None:
+    """Release the connections this app opened.
+
+    Without this, the engine's pool is collected after the loop has gone, which surfaces as
+    "Event loop is closed" during shutdown - noise in tests, and a leaked connection in a
+    process that creates more than one app.
+    """
+    if db is not None:
+        with contextlib.suppress(Exception):
+            await db.dispose()
+    if redis_client is not None:
+        closer = getattr(redis_client, "aclose", None) or getattr(redis_client, "close", None)
+        if closer is not None:
+            with contextlib.suppress(Exception):
+                await closer()
 
 
 def create_app(
@@ -285,10 +315,15 @@ def create_app(
         policy_store if policy_store is not None else PolicyStore(settings.policies_yaml, servers)
     )
 
+    # Anything the caller passed in belongs to the caller; only what we build here is ours to
+    # close on shutdown.
+    owned_redis = redis is None
+    owned_database = database is None
     redis_client = redis if redis is not None else build_redis(settings)
     limiter = RateLimiter(redis_client, gateway.limits)
 
     db = database if database is not None else Database(settings.database_url)
+    audit = AuditLog(db)
     jwt_keys = JwtKeyStore(settings.jwt_key_dir)
     token_service = TokenService(
         jwt_keys,
@@ -302,7 +337,11 @@ def create_app(
     )
     authenticator = Authenticator(api_keys=ApiKeyStore(db), tokens=token_service)
 
-    routes.extend(build_admin_routes(AdminDeps(policies=policies, upstreams=manager)))
+    routes.extend(
+        build_admin_routes(
+            AdminDeps(policies=policies, upstreams=manager, audit=audit, limiter=limiter)
+        )
+    )
     routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
     routes.append(
         Route(PROTECTED_RESOURCE_PATH, make_protected_resource_metadata(settings), methods=["GET"])
@@ -319,7 +358,7 @@ def create_app(
             registry=registry,
             upstreams=manager,
             pipeline_factory=build_pipeline_factory(
-                registry, servers, manager, policies, limiter, gateway.limits
+                registry, servers, manager, policies, limiter, gateway.limits, audit
             ),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
             tool_filter=build_tool_filter(policies),
@@ -344,17 +383,21 @@ def create_app(
         app.state.loop = asyncio.get_running_loop()
         remove_sighup = install_sighup_reload(policies)
         try:
+            await db.prepare()
             if session_manager is None:
                 yield
-                return
-            async with session_manager.run():
-                await manager.start(wait_seconds=upstream_wait_seconds)
-                try:
-                    yield
-                finally:
-                    await manager.stop()
+            else:
+                async with session_manager.run():
+                    await manager.start(wait_seconds=upstream_wait_seconds)
+                    try:
+                        yield
+                    finally:
+                        await manager.stop()
         finally:
             remove_sighup()
+            await _close_owned(
+                db if owned_database else None, redis_client if owned_redis else None
+            )
 
     app = Starlette(routes=routes, lifespan=lifespan)
     # Starlette wraps in reverse order of addition, so the request-id middleware added last is
@@ -375,6 +418,7 @@ def create_app(
     app.state.authenticator = authenticator
     app.state.policies = policies
     app.state.limiter = limiter
+    app.state.audit = audit
     app.state.redis = redis_client
     app.state.readiness = checks
     app.state.gateway_config = gateway
