@@ -1,0 +1,101 @@
+# Who may call what, with which arguments. Deny by default: a tool with no matching allow rule
+# is refused, and any matching deny rule beats every allow rule.
+
+# Risk overrides, keyed by namespaced tool name. Destructive tools require human approval
+# unless a rule sets require_approval: false.
+tool_risk:
+  notes_db__delete_note: destructive
+  notes_db__create_note: write
+  notes_db__run_sql: read
+  files__write_file: write
+  files__delete_file: destructive
+  evil__send_report: destructive
+
+roles:
+  reader:
+    description: Read-only access to notes and sandboxed files.
+    rules:
+      - id: reader-notes-read
+        effect: allow
+        tools: ["notes_db__list_notes", "notes_db__get_note", "notes_db__search_notes"]
+      - id: reader-files-read
+        effect: allow
+        tools: ["files__list_files", "files__read_file"]
+        constraints:
+          path:
+            max_length: 256
+      - id: reader-no-sql
+        effect: deny
+        tools: ["notes_db__run_sql"]
+        description: Ad-hoc SQL is an editor capability even though it is read-only.
+
+  editor:
+    description: Read and write notes and sandboxed files. Deletes need approval.
+    rules:
+      - id: editor-notes-read
+        effect: allow
+        tools: ["notes_db__list_notes", "notes_db__get_note", "notes_db__search_notes"]
+      - id: editor-notes-sql
+        effect: allow
+        tools: ["notes_db__run_sql"]
+        constraints:
+          query:
+            max_length: 2000
+      - id: editor-notes-create
+        effect: allow
+        tools: ["notes_db__create_note"]
+        constraints:
+          title:
+            max_length: 120
+          body:
+            max_length: 10000
+      - id: editor-notes-delete
+        effect: allow
+        tools: ["notes_db__delete_note"]
+        constraints:
+          note_id:
+            min: 1
+      - id: editor-files-read
+        effect: allow
+        tools: ["files__list_files", "files__read_file"]
+        constraints:
+          path:
+            max_length: 256
+      - id: editor-files-write
+        effect: allow
+        tools: ["files__write_file"]
+        constraints:
+          path:
+            max_length: 256
+            regex: "[A-Za-z0-9._/-]{1,256}"
+          content:
+            max_length: 1000000
+      - id: editor-files-delete
+        effect: allow
+        tools: ["files__delete_file"]
+        constraints:
+          path:
+            max_length: 256
+
+  admin:
+    description: Everything the gateway exposes, plus the admin API and approvals UI.
+    rules:
+      - id: admin-all-notes
+        effect: allow
+        tools: ["notes_db__*"]
+      - id: admin-all-files
+        effect: allow
+        tools: ["files__*"]
+
+  redteam:
+    description: Used by the red-team suite. Allowed to reach the evil server on purpose.
+    rules:
+      - id: redteam-notes
+        effect: allow
+        tools: ["notes_db__*"]
+      - id: redteam-files
+        effect: allow
+        tools: ["files__*"]
+      - id: redteam-evil
+        effect: allow
+        tools: ["evil__*"]

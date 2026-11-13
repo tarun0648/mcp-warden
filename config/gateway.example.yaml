@@ -1,0 +1,45 @@
+# Gateway limits, scanner switches and approval behaviour.
+limits:
+  default:
+    per_principal: { capacity: 60, refill_per_second: 1.0 }
+    per_tool: { capacity: 30, refill_per_second: 0.5 }
+    daily_calls: 2000
+    daily_destructive_calls: 25
+  roles:
+    reader:
+      per_principal: { capacity: 60, refill_per_second: 1.0 }
+      per_tool: { capacity: 30, refill_per_second: 0.5 }
+      daily_calls: 2000
+      daily_destructive_calls: 0
+    editor:
+      per_principal: { capacity: 120, refill_per_second: 2.0 }
+      per_tool: { capacity: 60, refill_per_second: 1.0 }
+      daily_calls: 5000
+      daily_destructive_calls: 50
+    admin:
+      per_principal: { capacity: 240, refill_per_second: 4.0 }
+      per_tool: { capacity: 120, refill_per_second: 2.0 }
+      daily_calls: 20000
+      daily_destructive_calls: 200
+  max_result_bytes: 262144
+  max_argument_bytes: 65536
+  fail_open_when_limiter_down: false
+
+scan:
+  classifier_enabled: false
+  classifier_model: protectai/deberta-v3-base-prompt-injection-v2
+  classifier_threshold: 0.8
+  classifier_timeout_seconds: 2.0
+  classifier_device: auto
+  definition_suspicious_score: 2
+  definition_malicious_score: 5
+  max_definition_description_chars: 1024
+  canaries: []
+
+approval:
+  wait_seconds: 60.0
+  expiry_seconds: 300.0
+  allow_self_approval: false
+
+upstream_connect_timeout_seconds: 10.0
+tools_refresh_seconds: 300.0

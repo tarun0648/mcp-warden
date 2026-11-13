@@ -1,0 +1,42 @@
+# Upstream MCP servers the gateway protects.
+# `trusted: true` auto-pins clean tool definitions and wraps flagged output.
+# `trusted: false` quarantines tools until an admin approves and blocks flagged output.
+upstreams:
+  - name: notes_db
+    transport:
+      kind: stdio
+      command: uv
+      args: ["run", "python", "-m", "servers.notes_db"]
+    enabled: true
+    trusted: true
+    timeout_seconds: 20.0
+    default_risk: read
+    tools:
+      create_note: { risk: write }
+      delete_note: { risk: destructive }
+
+  - name: files
+    transport:
+      kind: stdio
+      command: uv
+      args: ["run", "python", "-m", "servers.files"]
+    enabled: true
+    trusted: true
+    timeout_seconds: 20.0
+    default_risk: read
+    tools:
+      write_file: { risk: write }
+      delete_file: { risk: destructive }
+
+  # A deliberately malicious server. Only enabled by the red-team config.
+  - name: evil
+    transport:
+      kind: stdio
+      command: uv
+      args: ["run", "python", "-m", "servers.evil"]
+    enabled: false
+    trusted: false
+    timeout_seconds: 5.0
+    default_risk: write
+    tools:
+      send_report: { risk: destructive }
