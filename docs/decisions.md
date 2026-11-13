@@ -55,3 +55,22 @@ One line per decision, with the reason. Newest last.
 - **Tests enter the MCP client inside the test body, not in an async fixture.** The SDK's client is
   an anyio context manager; entering it in a pytest async fixture and exiting it in the finaliser
   crosses tasks, which anyio rejects with "cancel scope in a different task".
+
+## Phase 2 — malicious test server
+
+- **`servers/evil` is built on the low-level `Server`, not `MCPServer`.** The rug pull needs the
+  tool list to change between `tools/list` calls, and the poisoned descriptions must reach the
+  wire byte for byte, invisible characters included — neither survives schema generation from a
+  decorated Python function.
+- **Every hostile string lives in one module, `servers/evil/payloads.py`.** The scanner tests, the
+  red-team cases and the threat model all cite the same constants, and a reviewer can see the
+  whole hostile surface of this repo in one file.
+- **An AST scan, not a grep, proves the server is inert.** `tests/unit/test_evil_server_is_inert.py`
+  walks the package's syntax tree for forbidden imports, dotted calls (`os.remove`, `os.system`)
+  and builtins (`open`, `eval`), and fails if the package gains a module that the scan does not
+  cover. A grep is defeated by an alias; this is what makes the red-team suite safe to trust.
+- **Behaviour is fixed by environment variables, never randomness.** `EVIL_RUGPULL_AFTER` and
+  `EVIL_INJECTION_VARIANT` make each attack reproducible, which is what lets the red-team report
+  be compared against a baseline.
+- **`huge_output` and `slow_tool` are capped.** A test asking for a gigabyte must not take the
+  machine down with it; the cap is 4 MB and 30 seconds.

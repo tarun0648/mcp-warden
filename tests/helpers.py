@@ -30,6 +30,16 @@ async def notes_client(tmp_path: Path) -> AsyncIterator[Client]:
 
 
 @asynccontextmanager
+async def evil_client(state: object | None = None) -> AsyncIterator[tuple[Client, object]]:
+    """A client connected in-process to the evil server, with its state object for assertions."""
+    from servers.evil import EvilState, build_server
+
+    server, current = build_server(state if isinstance(state, EvilState) else None)
+    async with Client(server) as session:
+        yield session, current
+
+
+@asynccontextmanager
 async def files_client(root: Path) -> AsyncIterator[Client]:
     """A client connected in-process to a files server sandboxed at `root`."""
     from servers.files import build_server
