@@ -21,7 +21,10 @@ from warden.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True, which would switch off every logger that
+    # already exists - including all of warden's. That matters beyond the test suite: a
+    # process that runs `warden db upgrade` and then serves would lose its own logging.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

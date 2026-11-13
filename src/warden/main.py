@@ -28,7 +28,6 @@ from warden.auth.jwt_keys import JwtKeyStore, KeyStoreError
 from warden.auth.middleware import Authenticator, AuthMiddleware, principal_from_request
 from warden.auth.stage import Authenticate
 from warden.auth.tokens import (
-    NullRevocationStore,
     RedisRevocationStore,
     RevocationStore,
     TokenConfig,
@@ -36,6 +35,7 @@ from warden.auth.tokens import (
 )
 from warden.config import (
     GatewayConfig,
+    LimitsConfig,
     ServersConfig,
     Settings,
     load_gateway_config,
@@ -50,6 +50,8 @@ from warden.policy.store import PolicyStore
 from warden.proxy.registry import ToolRegistry
 from warden.proxy.server import GatewayDeps, build_mcp_server
 from warden.proxy.stages import ForwardToUpstream, ResolveTool
+from warden.ratelimit.limiter import RateLimiter
+from warden.ratelimit.stage import OutputLimit, RateLimit
 from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
@@ -183,14 +185,11 @@ def make_protected_resource_metadata(
     return metadata
 
 
-def build_revocation_store(settings: Settings) -> RevocationStore:
-    """Redis-backed revocation when a Redis URL is configured, else an explicit no-op."""
-    if not settings.redis_url:
-        logger.warning("no redis url configured; token revocation will not work")
-        return NullRevocationStore()
+def build_redis(settings: Settings) -> Any:
+    """One Redis client for the whole process: the limiter and the revocation list share it."""
     import redis.asyncio as aioredis
 
-    return RedisRevocationStore(aioredis.from_url(settings.redis_url))
+    return aioredis.from_url(settings.redis_url)
 
 
 def build_upstream_manager(
@@ -210,20 +209,24 @@ def build_pipeline_factory(
     servers_config: ServersConfig,
     upstreams: UpstreamManager,
     policies: PolicyStore,
+    limiter: RateLimiter,
+    limits: LimitsConfig,
 ) -> Callable[[], Pipeline]:
     """The pipeline, in the one order that is the security contract.
 
-    Phase 5: authenticate, resolve, policy, forward. Later phases insert DefinitionIntegrity
-    before policy, then RateLimit, ArgumentDLP and Approval before `forward`, and OutputScan
-    after it.
+    Phase 6: authenticate, resolve, policy, ratelimit, forward, output_limit. Later phases
+    insert DefinitionIntegrity before policy, ArgumentDLP and Approval before `forward`, and
+    OutputScan after `output_limit`.
     """
     authenticate = Authenticate()
     resolve = ResolveTool(registry, servers_config)
     policy = Policy(policies)
+    ratelimit = RateLimit(limiter, limits)
     forward = ForwardToUpstream(upstreams)
+    output_limit = OutputLimit(limits)
 
     def factory() -> Pipeline:
-        return Pipeline([authenticate, resolve, policy, forward])
+        return Pipeline([authenticate, resolve, policy, ratelimit, forward, output_limit])
 
     return factory
 
@@ -251,6 +254,7 @@ def create_app(
     upstreams: UpstreamManager | None = None,
     policy_store: PolicyStore | None = None,
     database: Database | None = None,
+    redis: Any | None = None,
     revocations: RevocationStore | None = None,
     mount_mcp: bool = True,
     upstream_wait_seconds: float = 0.0,
@@ -281,6 +285,9 @@ def create_app(
         policy_store if policy_store is not None else PolicyStore(settings.policies_yaml, servers)
     )
 
+    redis_client = redis if redis is not None else build_redis(settings)
+    limiter = RateLimiter(redis_client, gateway.limits)
+
     db = database if database is not None else Database(settings.database_url)
     jwt_keys = JwtKeyStore(settings.jwt_key_dir)
     token_service = TokenService(
@@ -291,7 +298,7 @@ def create_app(
             default_ttl_seconds=settings.jwt_default_ttl_seconds,
             clock_skew_seconds=settings.jwt_clock_skew_seconds,
         ),
-        revocations if revocations is not None else build_revocation_store(settings),
+        revocations if revocations is not None else RedisRevocationStore(redis_client),
     )
     authenticator = Authenticator(api_keys=ApiKeyStore(db), tokens=token_service)
 
@@ -311,7 +318,9 @@ def create_app(
             servers_config=servers,
             registry=registry,
             upstreams=manager,
-            pipeline_factory=build_pipeline_factory(registry, servers, manager, policies),
+            pipeline_factory=build_pipeline_factory(
+                registry, servers, manager, policies, limiter, gateway.limits
+            ),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
             tool_filter=build_tool_filter(policies),
         )
@@ -365,6 +374,8 @@ def create_app(
     app.state.tokens = token_service
     app.state.authenticator = authenticator
     app.state.policies = policies
+    app.state.limiter = limiter
+    app.state.redis = redis_client
     app.state.readiness = checks
     app.state.gateway_config = gateway
     app.state.servers_config = servers

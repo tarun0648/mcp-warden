@@ -19,7 +19,7 @@ the policy store, the limiter, the audit log or a scanner is unavailable, the ca
 | 3 | Transparent MCP proxy and pipeline skeleton | done |
 | 4 | API-key and ES256 JWT auth, JWKS, no token passthrough | done |
 | 5 | Deny-by-default policy engine with argument constraints | done |
-| 6 | Atomic rate limits, daily budgets, output size caps | not started |
+| 6 | Atomic rate limits, daily budgets, output size caps | done |
 | 7 | Insert-only hash-chained audit log | not started |
 | 8 | Definition pinning, rug-pull quarantine, DLP, injection scanning | not started |
 | 9 | Single-use human approvals with a web UI | not started |

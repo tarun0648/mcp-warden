@@ -179,3 +179,36 @@ One line per decision, with the reason. Newest last.
   effect on the next call rather than the next restart.
 - **Authentication is not authorisation.** `/admin` is behind the auth middleware *and* an
   explicit `admin` role check that answers 403 and logs the attempt.
+
+## Phase 6 — rate limits, budgets, size limits
+
+- **One Lua script decides every limit, all-or-nothing.** A limiter that reads, decides and
+  writes as separate commands loses to concurrency: fifty simultaneous requests each read "10
+  tokens left" and each allow themselves. The whole decision therefore runs inside a single
+  `EVAL`. The script also refuses to charge anything unless *every* limit allows the call, which
+  is stricter than checking each in turn and means a denied call never leaves a partial charge
+  the caller cannot see. Tested with 50 concurrent calls against both fakeredis and a real
+  Redis, asserting exactly the capacity passes.
+- **`fakeredis[lua]`, not a Python reimplementation of the script.** Unit tests execute the
+  same Lua the gateway ships. A second implementation next to the first would pass its own
+  tests and prove nothing about production.
+- **Bucket keys expire after a full refill plus a minute.** Once a bucket has refilled, its row
+  is indistinguishable from a fresh one, so keeping it only costs memory.
+- **Oversized *arguments* are refused locally, before Redis.** A giant payload should not cost a
+  token or be shipped into a Lua script to be measured.
+- **An oversized *result* is denied, never truncated.** A silently shortened tool result is a
+  correctness bug in whatever reads it, and for a model it is worse than an error, because the
+  model cannot tell that something is missing. `ctx.result` is cleared so no partial content can
+  leak out of a later stage.
+- **The limiter fails closed, and fail-open logs a warning every time the process starts.** The
+  flag exists for local development; a gateway running without limits should be impossible to
+  miss in the logs.
+- **The clock is injected.** Refill-after-time and budget-reset-at-UTC-midnight are the two
+  behaviours that would otherwise need `sleep` in a test.
+- **Alembic's `fileConfig` is called with `disable_existing_loggers=False`.** The default (True)
+  switches off every logger that already exists, including all of warden's. The test suite found
+  it as an order-dependent failure, but it is a production bug too: a process that ran
+  `warden db upgrade` and then served would lose its own logging.
+- **Tests assert on log output with a handler attached to the specific logger, not `caplog`.**
+  The gateway's `configure_logging` replaces the root handlers, so whether caplog's handler is
+  still attached depends on test order.

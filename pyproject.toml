@@ -51,7 +51,9 @@ dev = [
     "pytest-asyncio>=0.25,<2",
     "pytest-cov>=6.0,<8",
     "hypothesis>=6.127,<7",
-    "fakeredis>=2.27,<3",
+    # lupa gives fakeredis real Lua, so the limiter's script is executed in unit tests
+    # rather than reimplemented in Python next to it.
+    "fakeredis[lua]>=2.27,<3",
     "respx>=0.22,<1",
     "ruff>=0.9,<1",
     "mypy>=1.15,<3",

@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import fakeredis.aioredis
 import httpx
 import uvicorn
 from mcp import Client
@@ -176,6 +177,7 @@ class RunningGateway:
     #: Credentials minted for the test, by role name.
     keys: dict[str, str] = field(default_factory=dict)
     database_url: str = ""
+    redis: Any | None = None
 
     def auth(self, role: str = "admin") -> dict[str, str]:
         """An Authorization header for the credential minted for `role`."""
@@ -318,6 +320,7 @@ def running_gateway(
     gateway_overrides: dict[str, Any] | None = None,
     servers_config: Any | None = None,
     policies_config: Any | None = None,
+    redis: Any | None = None,
     wait_upstreams: float = 40.0,
     **servers_kwargs: Any,
 ) -> Iterator[RunningGateway]:
@@ -337,6 +340,10 @@ def running_gateway(
     keys = prepare_gateway_state(settings)
     gateway_config = GatewayConfig(**(gateway_overrides or {}))
     store = PolicyStore.from_config(settings.policies_yaml, servers, policies_config)
+    # fakeredis keeps its state in process and works across event loops, so the gateway's
+    # limiter runs the real Lua script without a Redis daemon. A Redis-marked integration test
+    # covers the real server.
+    redis_client = redis if redis is not None else fakeredis.aioredis.FakeRedis()
     app = create_app(
         settings,
         readiness=Readiness({}),
@@ -346,11 +353,13 @@ def running_gateway(
         # Integration tests must not need a Redis daemon; revocation has its own unit tests
         # against fakeredis and its own Redis-marked integration test.
         revocations=NullRevocationStore(),
+        redis=redis_client,
         upstream_wait_seconds=wait_upstreams,
     )
     with serve_app(app) as handle:
         handle.keys.update(keys)
         handle.database_url = settings.database_url
+        handle.redis = redis_client
         wait_for_tools(handle, timeout=wait_upstreams + 20)
         yield handle
 
