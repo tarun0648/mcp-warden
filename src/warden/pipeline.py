@@ -72,6 +72,11 @@ class RequestContext:
     requires_approval: bool = False
     approval_id: str | None = None
     scan_flags: dict[str, Any] = field(default_factory=dict)
+    #: Dotted paths into `arguments` whose values must be masked wherever the arguments are
+    #: stored. Set by the DLP stage: `redact()` masks by *key name*, so a credential sent under
+    #: an innocent key like "body" would otherwise be written to the audit log verbatim - the
+    #: very value the gateway just refused to forward.
+    redact_paths: set[str] = field(default_factory=set)
     result: CallToolResult | None = None
     result_bytes: int = 0
     #: Set when the upstream actually ran, so the audit log can tell "denied before forwarding"

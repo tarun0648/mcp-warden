@@ -195,7 +195,12 @@ class ScanConfig(StrictModel):
 
     classifier_enabled: bool = False
     classifier_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
-    classifier_threshold: float = Field(default=0.8, ge=0.0, le=1.0)
+    #: 0.999, not the 0.8 this started at. Measured on tests/data (46 attacks, 46 benign):
+    #: at 0.8 the model flagged 17.4% of ordinary text, scoring "Never store credentials in the
+    #: repository; use the secret store." at 1.0000 - the same as a real injection. No
+    #: threshold separates the two classes on that set; 0.999 is the point where it still adds
+    #: ~70% independent detection at ~4% false positives. See docs/decisions.md.
+    classifier_threshold: float = Field(default=0.999, ge=0.0, le=1.0)
     classifier_timeout_seconds: float = Field(default=2.0, gt=0, le=60)
     classifier_device: Literal["auto", "cpu", "mps"] = "auto"
     #: Score at or above which a tool definition is quarantined instead of merely flagged.

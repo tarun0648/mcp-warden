@@ -117,3 +117,42 @@ do not reach a child process.
 - **Hardware-backed key storage.** The ES256 private keys are files with mode `0600` in a
   gitignored directory, with `detect-private-key` in pre-commit as the backstop against a
   commit. A production deployment should use a KMS or a secret store instead.
+
+## Phase 8 — tool poisoning, rug pulls, injection and exfiltration
+
+This is the boundary-2 half of the model: upstream descriptions and results are data, never
+instructions.
+
+### What is enforced
+
+| Attack | Control | Result |
+| --- | --- | --- |
+| Tool poisoning (hidden instructions in a description) | definition scan on every refresh | quarantined, hidden from `tools/list`, `WARDEN_DENIED:quarantined` |
+| Rug pull (approved definition changes later) | SHA-256 pin per tool, compared on every refresh | quarantined, with a diff for the operator |
+| Tool shadowing (claims to replace another server's tool) | cross-tool reference rules | quarantined |
+| Indirect prompt injection in a result | output scan; block for untrusted, wrap for trusted | `WARDEN_DENIED:injection`, or fenced and labelled |
+| Encoded injection (base64, zero-width, bidi, non-English) | one decode layer, NFKC folding, invisible stripping | detected by the same rules |
+| Exfiltration through an argument | DLP scan before forwarding | `WARDEN_DENIED:dlp`, never forwarded |
+| An unreviewed third-party server | `trusted: false` | every tool quarantined until an admin approves |
+
+### Known gaps, stated rather than implied
+
+- **The classifier is weak on structural attacks.** Measured at 69.6% detection with 4.3% false
+  positives on the project's own labelled set; it misses every shadowing and exfiltration case.
+  It is one weighted signal and cannot block or quarantine on its own. See
+  `docs/decisions.md` for the full table and the threshold sweep.
+- **A novel phrasing that matches no rule and scores below the classifier threshold gets
+  through.** The rules are specific by design, which is what keeps false positives near zero,
+  and the cost is that they are not a general injection detector. Policy, approvals and the
+  audit log are the layers that assume this one will sometimes fail.
+- **`redact()` masks by key name.** A secret sent under an innocent key reaches the audit log
+  unless DLP flags it — which is why DLP marks the paths it found and the audit writer masks
+  them by position. A secret DLP does not recognise is still stored redacted-by-name only.
+- **Wrapping is advisory.** A model that ignores the warning banner and follows the fenced text
+  anyway is not something the gateway can prevent; that is why destructive tools need an
+  approval as well.
+- **The hash chain detects partial tampering, not a wholesale rebuild**, and truncating the tail
+  leaves a consistent chain. `warden audit verify` prints the head hash so it can be pinned
+  outside the gateway; doing that pinning is not implemented.
+- **SQLite has no roles**, so the append-only property of the audit log rests on the hash chain
+  alone there. `warden db harden` makes it a grant on Postgres.

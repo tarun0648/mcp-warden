@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Final
@@ -27,7 +28,7 @@ from warden.db.base import utcnow
 from warden.db.engine import AUDIT_CHAIN_LOCK_KEY, Database
 from warden.db.models import AuditEvent
 from warden.errors import ReasonCode
-from warden.logging import get_logger, redact
+from warden.logging import REDACTED, get_logger, redact
 from warden.pipeline import Decision, RequestContext
 
 logger = get_logger(__name__)
@@ -252,6 +253,31 @@ def _apply_filters(statement: Any, filters: AuditFilters) -> Any:
     return statement
 
 
+def mask_paths(value: Any, paths: Iterable[str]) -> Any:
+    """Replace the values at `paths` with the redaction marker.
+
+    `redact()` masks by key *name*, which cannot see a credential sent under an innocent key.
+    The DLP scanner knows exactly where it found one, so those paths are masked by position.
+    """
+    wanted = {path for path in paths if path and path != "<root>"}
+    if not wanted:
+        return value
+    return _mask(value, "", wanted)
+
+
+def _mask(value: Any, path: str, wanted: set[str]) -> Any:
+    if path in wanted:
+        return REDACTED
+    if isinstance(value, dict):
+        return {
+            key: _mask(item, f"{path}.{key}" if path else str(key), wanted)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask(item, f"{path}[{index}]", wanted) for index, item in enumerate(value)]
+    return value
+
+
 def _row_fields(ctx: RequestContext, event: str) -> dict[str, Any]:
     """Turn a request context into the row to append.
 
@@ -273,7 +299,7 @@ def _row_fields(ctx: RequestContext, event: str) -> dict[str, Any]:
         "tool": ctx.tool_name,
         "upstream": ctx.upstream,
         "risk": str(ctx.risk),
-        "args_redacted": redact(ctx.arguments),
+        "args_redacted": mask_paths(redact(ctx.arguments), ctx.redact_paths),
         "args_sha256": hash_arguments(ctx.arguments),
         "decision": str(ctx.decision) if event != EVENT_STARTED else str(Decision.ALLOW),
         "reason_code": str(ctx.reason_code) if event != EVENT_STARTED else str(ReasonCode.ALLOWED),

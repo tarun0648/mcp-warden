@@ -27,10 +27,12 @@ from warden.config import (
     load_gateway_config,
     load_policies_config,
     load_servers_config,
+    split_namespaced,
 )
 from warden.db.engine import Database
 from warden.errors import ConfigError
 from warden.logging import configure_logging
+from warden.scan.definitions import diff_definitions
 
 app = typer.Typer(
     name="warden",
@@ -105,8 +107,12 @@ def check_config() -> None:
     console.print(f"  limits:    max result {gateway.limits.max_result_bytes} bytes")
 
 
-@app.command()
-def tools(
+tools_app = typer.Typer(help="Inspect upstream tools and manage their pins.", no_args_is_help=True)
+app.add_typer(tools_app, name="tools")
+
+
+@tools_app.command("live")
+def tools_live(
     wait: Annotated[float, typer.Option(help="Seconds to wait for upstreams to connect.")] = 15.0,
 ) -> None:
     """Connect to every enabled upstream and print the aggregated tool list."""
@@ -519,6 +525,141 @@ def audit_privileges_command(
         style = "red" if (granted and expected_absent) else "green"
         table.add_row(name, f"[{style}]{mark}[/{style}]")
     console.print(table)
+
+
+@tools_app.command("list")
+def tools_list(
+    status: Annotated[
+        str | None, typer.Option(help="Show only pins with this status: pinned | quarantined.")
+    ] = None,
+) -> None:
+    """Show the pin table: what has been accepted, what is quarantined, and why."""
+    rows = asyncio.run(_with_pins(lambda pins: pins.list_pins(status=status)))
+    table = Table(title="tool pins")
+    for column in ("tool", "status", "reason", "verdict", "rules", "sha256", "approved by"):
+        table.add_column(column, overflow="fold")
+    for row in rows:
+        scan = row.get("scan") or {}
+        style = "red" if row["status"] == "quarantined" else "green"
+        table.add_row(
+            row["name"],
+            f"[{style}]{row['status']}[/{style}]",
+            row["reason"] or "-",
+            str(scan.get("verdict", "-")),
+            ", ".join(scan.get("rules", [])) or "-",
+            row["sha256"][:12],
+            row["approved_by"] or "-",
+        )
+    console.print(table)
+    quarantined = [row for row in rows if row["status"] == "quarantined"]
+    if quarantined:
+        console.print(
+            f"[yellow]{len(quarantined)} tool(s) quarantined.[/yellow] "
+            "Review one with `warden tools diff <tool>`, then `warden tools approve <tool>`."
+        )
+
+
+@tools_app.command("diff")
+def tools_diff(
+    tool: Annotated[str, typer.Argument(help="Namespaced tool name, e.g. evil__fetch_quote.")],
+) -> None:
+    """Show what changed between the pinned definition and the current one."""
+    parts = split_namespaced(tool)
+    if parts is None:
+        console.print("[red]error:[/red] name the tool as <server>__<tool>")
+        raise typer.Exit(code=2)
+
+    async def work(pins: Any) -> Any:
+        return await pins.get_pin(*parts), await pins.definitions_for_diff(*parts)
+
+    pin, pair = asyncio.run(_with_pins(work))
+    if pin is None or pair is None:
+        console.print(f"[yellow]no pin recorded for {tool}[/yellow]")
+        raise typer.Exit(code=1)
+    previous, current = pair
+    scan = pin.get("scan") or {}
+
+    console.print(f"[bold]{tool}[/bold]  status: {pin['status']}")
+    console.print(f"  pinned sha256:   {pin['sha256']}")
+    console.print(f"  previous sha256: {scan.get('previous_sha256') or '(none)'}")
+    console.print(f"  scan verdict:    {scan.get('verdict', '-')} (score {scan.get('score', 0)})")
+    for finding in scan.get("findings", []):
+        console.print(
+            f"    [yellow]{finding['rule']}[/yellow] at {finding['where'] or '-'}: "
+            f"{finding['evidence']}"
+        )
+    lines = diff_definitions(previous, current)
+    if not lines:
+        console.print("  [green]no change since the definition was pinned[/green]")
+        return
+    console.print("  changes (- pinned, + current):")
+    for line in lines:
+        colour = (
+            "red"
+            if line.strip().startswith("-")
+            else "green"
+            if line.strip().startswith("+")
+            else "white"
+        )
+        console.print(f"    [{colour}]{line}[/{colour}]")
+
+
+@tools_app.command("approve")
+def tools_approve(
+    tool: Annotated[str, typer.Argument(help="Namespaced tool name.")],
+    by: Annotated[str, typer.Option(help="Who is accepting this definition.")] = "cli",
+) -> None:
+    """Pin the current definition, making the tool listable and callable again."""
+    parts = split_namespaced(tool)
+    if parts is None:
+        console.print("[red]error:[/red] name the tool as <server>__<tool>")
+        raise typer.Exit(code=2)
+    ok = asyncio.run(_with_pins(lambda pins: pins.approve(*parts, approved_by=by)))
+    if not ok:
+        console.print(f"[yellow]no pin recorded for {tool}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]ok[/green] {tool} is pinned; it takes effect on the next call")
+
+
+@tools_app.command("quarantine")
+def tools_quarantine(
+    tool: Annotated[str, typer.Argument(help="Namespaced tool name.")],
+    reason: Annotated[str, typer.Option(help="Why.")] = "quarantined by an operator",
+    by: Annotated[str, typer.Option(help="Who is quarantining it.")] = "cli",
+) -> None:
+    """Quarantine a tool by hand, hiding it and refusing calls to it."""
+    parts = split_namespaced(tool)
+    if parts is None:
+        console.print("[red]error:[/red] name the tool as <server>__<tool>")
+        raise typer.Exit(code=2)
+    ok = asyncio.run(_with_pins(lambda pins: pins.quarantine(*parts, by=by, reason=reason)))
+    if not ok:
+        console.print(f"[yellow]no pin recorded for {tool}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]ok[/green] {tool} is quarantined")
+
+
+async def _with_pins(work: Any) -> Any:
+    """Run `work(pin_store)` against a short-lived database connection.
+
+    The CLI talks to the same tables a running gateway does; a change takes effect on that
+    gateway's next refresh, or immediately for a call, because the pipeline reads the pin
+    store's view and the gateway reloads it when a listing changes.
+    """
+    from warden.scan.definitions import DefinitionScanner
+    from warden.scan.pinning import PinStore
+
+    settings = _settings()
+    gateway = load_gateway_config(settings.gateway_yaml)
+    database = _database()
+    try:
+        store = PinStore(database, DefinitionScanner(gateway.scan, None))
+        outcome = work(store)
+        if asyncio.iscoroutine(outcome):
+            return await outcome
+        return outcome
+    finally:
+        await database.dispose()
 
 
 def main() -> None:

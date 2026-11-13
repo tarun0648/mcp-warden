@@ -38,6 +38,7 @@ from warden.auth.tokens import (
 from warden.config import (
     GatewayConfig,
     LimitsConfig,
+    ScanConfig,
     ServersConfig,
     Settings,
     load_gateway_config,
@@ -54,6 +55,11 @@ from warden.proxy.server import GatewayDeps, build_mcp_server
 from warden.proxy.stages import ForwardToUpstream, ResolveTool
 from warden.ratelimit.limiter import RateLimiter
 from warden.ratelimit.stage import OutputLimit, RateLimit
+from warden.scan.classifier import InjectionClassifier
+from warden.scan.definitions import DefinitionScanner
+from warden.scan.output import OutputScanner
+from warden.scan.pinning import PinStore
+from warden.scan.stages import ArgumentDLP, DefinitionIntegrity, OutputScan
 from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
@@ -214,46 +220,75 @@ def build_pipeline_factory(
     limiter: RateLimiter,
     limits: LimitsConfig,
     audit: AuditLog,
+    pins: PinStore,
+    scan_config: ScanConfig,
+    output_scanner: OutputScanner,
 ) -> Callable[[], Pipeline]:
     """The pipeline, in the one order that is the security contract.
 
-    Phase 7: authenticate, resolve, policy, ratelimit, audit (write-ahead), forward,
-    output_limit - with the audit writer as a finish hook so every request leaves a record
-    whatever happens. Later phases insert DefinitionIntegrity before policy, and ArgumentDLP
-    and Approval between ratelimit and audit, and OutputScan after output_limit.
+    Phase 8 completes the order CLAUDE.md specifies: authenticate, resolve, definitions,
+    policy, ratelimit, dlp, audit (write-ahead), forward, output_limit, output_scan - with the
+    audit writer as a finish hook so every request leaves a record whatever happens. Phase 9
+    inserts Approval between dlp and audit.
 
-    The write-ahead row is the last thing before `forward` on purpose: everything that can
-    refuse the call cheaply has already run, so the log is not filled with rows for calls that
-    were never going to happen, and nothing that *can* reach an upstream runs before it.
+    Two placements are deliberate:
+
+    * `definitions` runs before `policy`, so a quarantined tool is refused for the same reason
+      whoever asks, rather than reporting "no permission" to one caller and "quarantined" to
+      another.
+    * the write-ahead row is the last thing before `forward`: everything that can refuse the
+      call cheaply has already run, so the log is not filled with rows for calls that were
+      never going to happen, and nothing that *can* reach an upstream runs before it.
     """
     authenticate = Authenticate()
     resolve = ResolveTool(registry, servers_config)
+    definitions = DefinitionIntegrity(pins)
     policy = Policy(policies)
     ratelimit = RateLimit(limiter, limits)
+    dlp = ArgumentDLP(scan_config)
     write_ahead = AuditWriteAhead(audit)
     forward = ForwardToUpstream(upstreams)
     output_limit = OutputLimit(limits)
+    output_scan = OutputScan(output_scanner, servers_config)
     finish = audit_finish_hook(audit)
 
     def factory() -> Pipeline:
         return Pipeline(
-            [authenticate, resolve, policy, ratelimit, write_ahead, forward, output_limit],
+            [
+                authenticate,
+                resolve,
+                definitions,
+                policy,
+                ratelimit,
+                dlp,
+                write_ahead,
+                forward,
+                output_limit,
+                output_scan,
+            ],
             [finish],
         )
 
     return factory
 
 
-def build_tool_filter(policies: PolicyStore) -> Callable[..., list[Any]]:
-    """Filter `tools/list` down to what the caller could call.
+def build_tool_filter(policies: PolicyStore, pins: PinStore) -> Callable[..., list[Any]]:
+    """Filter `tools/list` down to what the caller could call, and what we trust.
 
-    Argument constraints are ignored for listing, but a tool whose only matching rule is a deny
-    is hidden entirely: a reader should not learn that `files__delete_file` exists.
+    Two filters, in this order:
+
+    * quarantined tools are removed for everyone - a model that can see a tool keeps trying it,
+      and for a poisoned tool the description *is* the attack, so hiding it matters as much as
+      refusing the call;
+    * then the policy, where argument constraints are ignored but a tool whose only matching
+      rule is a deny is hidden entirely: a reader should not learn that `files__delete_file`
+      exists.
     """
 
     def filter_tools(principal: Principal | None, tools: list[Any]) -> list[Any]:
-        allowed = set(policies.engine.visible_tools(principal, [tool.name for tool in tools]))
-        return [tool for tool in tools if tool.name in allowed]
+        usable = [tool for tool in tools if not pins.is_quarantined(tool.name)]
+        allowed = set(policies.engine.visible_tools(principal, [tool.name for tool in usable]))
+        return [tool for tool in usable if tool.name in allowed]
 
     return filter_tools
 
@@ -285,6 +320,7 @@ def create_app(
     policy_store: PolicyStore | None = None,
     database: Database | None = None,
     redis: Any | None = None,
+    injection_classifier: InjectionClassifier | None = None,
     revocations: RevocationStore | None = None,
     mount_mcp: bool = True,
     upstream_wait_seconds: float = 0.0,
@@ -309,7 +345,6 @@ def create_app(
     )
     registry = ToolRegistry()
     manager = upstreams if upstreams is not None else build_upstream_manager(gateway, servers)
-    manager.on_tools_changed = registry.replace
 
     policies = (
         policy_store if policy_store is not None else PolicyStore(settings.policies_yaml, servers)
@@ -324,6 +359,32 @@ def create_app(
 
     db = database if database is not None else Database(settings.database_url)
     audit = AuditLog(db)
+
+    classifier = (
+        injection_classifier
+        if injection_classifier is not None
+        else InjectionClassifier(
+            enabled=gateway.scan.classifier_enabled or settings.classifier_enabled,
+            model_id=gateway.scan.classifier_model,
+            device=gateway.scan.classifier_device,
+            timeout_seconds=gateway.scan.classifier_timeout_seconds,
+        )
+    )
+    pins = PinStore(db, DefinitionScanner(gateway.scan, classifier))
+    output_scanner = OutputScanner(gateway.scan, classifier)
+    trusted = [upstream.name for upstream in servers.upstreams if upstream.trusted]
+
+    async def on_tools_changed(tools_by_upstream: Any) -> None:
+        """Re-pin and re-register whenever an upstream's listing changes.
+
+        Pins are reconciled *before* the registry is rebuilt. During the gap the registry still
+        holds the previously approved definitions, which is the safe direction: the alternative
+        would briefly advertise a definition that has just changed under us.
+        """
+        await pins.reconcile(tools_by_upstream, trusted_servers=trusted)
+        registry.replace(tools_by_upstream)
+
+    manager.on_tools_changed = on_tools_changed
     jwt_keys = JwtKeyStore(settings.jwt_key_dir)
     token_service = TokenService(
         jwt_keys,
@@ -339,7 +400,13 @@ def create_app(
 
     routes.extend(
         build_admin_routes(
-            AdminDeps(policies=policies, upstreams=manager, audit=audit, limiter=limiter)
+            AdminDeps(
+                policies=policies,
+                upstreams=manager,
+                audit=audit,
+                limiter=limiter,
+                pins=pins,
+            )
         )
     )
     routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
@@ -358,10 +425,19 @@ def create_app(
             registry=registry,
             upstreams=manager,
             pipeline_factory=build_pipeline_factory(
-                registry, servers, manager, policies, limiter, gateway.limits, audit
+                registry,
+                servers,
+                manager,
+                policies,
+                limiter,
+                gateway.limits,
+                audit,
+                pins,
+                gateway.scan,
+                output_scanner,
             ),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
-            tool_filter=build_tool_filter(policies),
+            tool_filter=build_tool_filter(policies, pins),
         )
         mcp_server = build_mcp_server(deps)
         session_manager = StreamableHTTPSessionManager(
@@ -385,8 +461,15 @@ def create_app(
         try:
             await db.prepare()
             if session_manager is None:
+                # Health-only app: there are no tools to protect and no MCP endpoint, so the
+                # pin store and the classifier are not consulted.
                 yield
             else:
+                # Deliberately not guarded: a gateway that cannot read which tools are
+                # quarantined must refuse to start rather than start without knowing.
+                await pins.load_quarantine_view()
+                if classifier.enabled:
+                    await classifier.warm_up()
                 async with session_manager.run():
                     await manager.start(wait_seconds=upstream_wait_seconds)
                     try:
@@ -419,6 +502,8 @@ def create_app(
     app.state.policies = policies
     app.state.limiter = limiter
     app.state.audit = audit
+    app.state.pins = pins
+    app.state.classifier = classifier
     app.state.redis = redis_client
     app.state.readiness = checks
     app.state.gateway_config = gateway

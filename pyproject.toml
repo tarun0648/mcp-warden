@@ -82,7 +82,9 @@ ignore = ["S101", "S311", "B008", "RUF012", "N818", "ASYNC109"]
 [tool.ruff.lint.per-file-ignores]
 # ASYNC210/221: some tests deliberately make a raw blocking request or spawn a process, to
 # bypass the MCP client and observe the HTTP or process layer directly.
-"tests/**" = ["S", "E501", "ASYNC210", "ASYNC221"]
+# RUF001/RUF003: some tests contain lookalike characters on purpose - that is the attack
+# being tested.
+"tests/**" = ["S", "E501", "ASYNC210", "ASYNC221", "RUF001", "RUF002", "RUF003"]
 "servers/evil/**" = ["S", "E501"]
 # S608: DDL cannot parameterise an identifier, so GRANT/CREATE ROLE statements are built
 # from module constants. No request data reaches them.

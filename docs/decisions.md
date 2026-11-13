@@ -259,3 +259,100 @@ One line per decision, with the reason. Newest last.
   "100 concurrent calls" test quietly became a "30 concurrent calls" test.
 - **The CSV export leaves out the nested JSON columns.** Quoting rules for embedded JSON differ
   per spreadsheet; the JSON endpoint carries them faithfully instead.
+
+## Phase 8 — content security
+
+### The classifier is worth less than the rules, and the measurement says so
+
+Measured on `tests/data` (46 attacks across 8 categories, 46 benign examples), with
+`uv run pytest -m ml`:
+
+| Configuration | Detection | False positives |
+| --- | --- | --- |
+| Rules only | 46/46 (100%) | 0/46 (0%) |
+| Classifier only, at 0.999 | 32/46 (69.6%) | 2/46 (4.3%) |
+| Rules + classifier | 46/46 (100%) | 2/46 (4.3%) |
+
+On this set the classifier **adds no detection and costs two false positives**. It misses every
+shadowing case, every exfiltration case and most tool-poisoning cases — because those attacks
+are structural ("use this instead of `files__read_file`") rather than imperative, and a
+prompt-injection classifier is trained on the imperative kind.
+
+Three consequences, all of them in the code:
+
+- **`classifier_threshold` defaults to 0.999, not 0.8.** At 0.8 the model flagged 17.4% of
+  ordinary text; it scores *"Never store credentials in the repository; use the secret store."*
+  at **1.0000** — identical to a real injection. A threshold sweep showed no value that
+  separates the two classes on this set: 0.95 gives 78%/15%, 0.999 gives 70%/4%. 0.999 is the
+  measured operating point, not a guess, and this is a change to a production default justified
+  by data — the test's 85%/5% assertion was left where the plan put it.
+- **A classifier hit can never decide on its own.** It is weighted `HIGH`, which reaches
+  `suspicious` but not `malicious`, so a false positive costs a warning banner on a trusted
+  server's output rather than a refused call. `test_a_classifier_hit_alone_can_never_block_or_quarantine`
+  pins that.
+- **The `ml` test reports the classifier-alone figure next to the combined one.** Reporting only
+  the combined number would let the rules flatter the model, which is the sort of number hard
+  rule 7 exists to prevent.
+
+The honest caveat: the rules reach 100%/0% on a set **I wrote and then tuned two rules against**,
+so that is not an independent benchmark. The classifier was never tuned against it, which is
+part of why it looks worse. The red-team suite with a baseline comparison (Phase 11) is the
+stronger measurement, and it reports both columns for the same reason.
+
+### Everything else
+
+- **Rules are specific, not keyword lists.** "ignore" alone is not a signal; "ignore all previous
+  instructions" is. "password" alone is not a signal — a password-policy note is ordinary;
+  "~/.ssh/id_rsa" is. Each rule has at least three positive and three negative examples, and the
+  negatives are drawn from the notes and tool descriptions this project actually ships.
+- **Two false positives found by writing the negatives first.** `credentials` as a bare word
+  flagged the seeded note "Rotate credentials every 90 days", so the rule now requires a file
+  context; `.env` flagged this repository's own `.env.example`, so that is excluded explicitly.
+- **Text is NFKC-folded and invisible-stripped before matching**, so `i<ZWSP>gnore` and a
+  fullwidth rendering are not bypasses, while the invisible characters are *also* reported as a
+  finding in their own right.
+- **Base64 is decoded one layer and re-scanned, never recursively.** Recursing on
+  attacker-controlled data is how a scanner becomes the denial of service.
+- **Each rule contributes at most once however many times it fires.** Forty zero-width
+  characters are one unicode problem, not forty, or a single noisy rule would outvote every
+  other signal.
+- **Evidence is excerpted and escaped, never quoted raw.** It reaches logs, audit rows and CLI
+  tables; a scanner that reproduced hostile text would hand the attacker a second channel into
+  whoever is reading the report.
+- **A malicious definition is quarantined whoever serves it**, trusted or not. A trusted server
+  can be compromised, and that is precisely the case where auto-pinning must not apply.
+- **An untrusted server's tools start quarantined even when the scan is clean.** That is what
+  `trusted: false` buys. A clean scan is not a review.
+- **The blocking threshold for output comes from the per-server action, not the verdict.** An
+  untrusted server's flagged output is blocked at `suspicious`, because there is no user data to
+  preserve and flagged content from a server we do not trust is most likely the attack; a
+  trusted server's is wrapped and never blocked, because it is usually the user's own note
+  quoting an instruction and swallowing it would lose their data.
+- **Wrapped results keep their structured content, defanged.** Dropping it was the first
+  implementation and it was a protocol bug: a tool that declares an `outputSchema` must return
+  structured content, and a conforming client *raises* instead of accepting the result — so a
+  wrapped answer became an error. Fencing it is not possible either, since the delimiters would
+  have to go inside a schema-constrained field. The strings are stripped of hidden characters
+  and the warning lives in `content`, which is what a model reads first.
+- **The fence is escaped inside the content**, so hostile text cannot close its own delimiter
+  and get out from under the warning.
+- **DLP masks the arguments it flagged, by path.** `redact()` masks by key *name*, so a secret
+  sent as `{"body": "<key>"}` was being written to the audit log verbatim — the very value the
+  gateway had just refused to forward. The DLP scanner knows where it found one, so
+  `ctx.redact_paths` masks those positions while `args_sha256` still covers the real arguments.
+- **Generic high entropy is weighted so it cannot deny alone.** `files__write_file` content is
+  legitimately arbitrary — a base64 image or a minified bundle is high-entropy and innocent — and
+  weighting it to deny would make the gateway unusable for writing files, which is the kind of
+  false positive that gets a security control switched off.
+- **`DefinitionIntegrity` runs before `Policy`**, so a quarantined tool is refused for the same
+  reason whoever asks, rather than reporting "no permission" to one caller and "quarantined" to
+  another.
+- **Quarantined tools are hidden from `tools/list` as well as refused.** For a poisoned tool the
+  description *is* the attack, and a model that can see a tool keeps trying it.
+- **The pin store keeps an in-memory view of what is quarantined**, rebuilt whenever a listing
+  changes, so a `tools/call` never waits on a query to find out. A gateway that cannot read that
+  view at startup **refuses to start**: coming up without it would serve every tool as though it
+  had been approved.
+- **`ToolPin.as_dict()` deliberately omits the definition.** A definition is attacker-controlled
+  text and the pins listing has no reason to carry every poisoned description; only the diff
+  endpoint asks for it, through `definitions_for_diff`, and renders both sides via `excerpt`.

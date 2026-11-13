@@ -561,3 +561,38 @@ def tamper_sqlite(url: str, statement: str, parameters: tuple[Any, ...] = ()) ->
         connection.commit()
     finally:
         connection.close()
+
+
+def approve_tool(handle: RunningGateway, tool: str) -> dict[str, Any]:
+    """Approve a tool's current definition through the admin API, as an operator would.
+
+    Untrusted servers start quarantined, so a test about something else - a timeout, a size
+    limit - has to get past that first. Going through the HTTP API rather than the PinStore
+    keeps the work on the gateway's own event loop, where the store lives.
+    """
+    response = httpx.post(
+        f"{handle.url}/admin/pins/{tool}/approve", headers=handle.auth("admin"), timeout=20
+    )
+    assert response.status_code == 200, response.text
+    return dict(response.json())
+
+
+def pins(handle: RunningGateway, status: str | None = None) -> dict[str, Any]:
+    """The current pin table, through the admin API."""
+    params = {"status": status} if status else {}
+    response = httpx.get(
+        f"{handle.url}/admin/pins",
+        params=params,
+        headers=handle.auth("admin"),
+        timeout=20,
+    )
+    assert response.status_code == 200, response.text
+    return dict(response.json())
+
+
+def pin_diff(handle: RunningGateway, tool: str) -> dict[str, Any]:
+    response = httpx.get(
+        f"{handle.url}/admin/pins/{tool}", headers=handle.auth("admin"), timeout=20
+    )
+    assert response.status_code == 200, response.text
+    return dict(response.json())

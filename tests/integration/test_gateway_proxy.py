@@ -6,7 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers import error_text, gateway_client, payload, running_gateway, wait_until
+from tests.helpers import (
+    approve_tool,
+    error_text,
+    gateway_client,
+    payload,
+    running_gateway,
+    wait_until,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -108,6 +115,9 @@ async def test_killing_one_upstream_removes_only_its_tools(tmp_path: Path) -> No
 
 async def test_slow_upstream_hits_the_timeout(tmp_path: Path) -> None:
     with running_gateway(tmp_path, include_evil=True, evil_timeout=1.0) as gateway:
+        # The evil server is untrusted, so its tools start quarantined; this test is about the
+        # timeout, so an admin approves the one tool it needs.
+        approve_tool(gateway, "evil__slow_tool")
         async with gateway_client(gateway, gateway.auth("redteam")) as client:
             result = await client.call_tool("evil__slow_tool", {"seconds": 10})
     assert "WARDEN_UPSTREAM_TIMEOUT" in error_text(result)

@@ -13,10 +13,10 @@ import httpx
 import pytest
 
 from tests.helpers import (
+    approve_tool,
     audit_rows,
     error_text,
     gateway_client,
-    issue_token,
     payload,
     policies_allowing,
     running_gateway,
@@ -132,6 +132,7 @@ async def test_an_upstream_timeout_is_recorded_as_finished(tmp_path: Path) -> No
     with running_gateway(
         tmp_path, include_evil=True, evil_timeout=1.0, policies_config=policies
     ) as gateway:
+        approve_tool(gateway, "evil__slow_tool")
         async with gateway_client(gateway, gateway.auth("redteam")) as client:
             result = await client.call_tool("evil__slow_tool", {"seconds": 10})
         rows = rows_for(gateway.database_url, request_id_of(result))
@@ -176,6 +177,7 @@ async def test_an_oversized_result_denial_is_recorded_after_the_call_ran(
         gateway_overrides=overrides,
         policies_config=policies,
     ) as gateway:
+        approve_tool(gateway, "evil__huge_output")
         async with gateway_client(gateway, gateway.auth("redteam")) as client:
             result = await client.call_tool("evil__huge_output", {"kb": 64})
         rows = rows_for(gateway.database_url, request_id_of(result))
@@ -359,11 +361,14 @@ async def test_an_unwritable_audit_log_denies_the_call_and_forwards_nothing(
 ) -> None:
     """Hard rule 1 for the audit log, with the upstream watching.
 
-    The gateway points at an unreachable Postgres, and the caller uses a JWT, which is verified
-    from a key file rather than the database. So authentication succeeds, the policy allows, the
-    limiter allows - and the write-ahead row cannot be written.
+    The gateway starts healthy, then the audit table is dropped from under it - a stand-in for
+    "the audit store became unavailable while we were serving". Authentication, policy and the
+    limiter all still work, so the write-ahead row is the only thing that fails, which is
+    exactly the claim: a call that cannot be recorded is a call that is not forwarded.
     """
-    from tests.helpers import header_recording_upstream
+    import sqlite3
+
+    from tests.helpers import header_recording_upstream, sqlite_path
     from warden.config import HttpTransport, Risk, ServersConfig, UpstreamConfig
 
     with header_recording_upstream() as (upstream_url, seen_headers):
@@ -379,31 +384,86 @@ async def test_an_unwritable_audit_log_denies_the_call_and_forwards_nothing(
             ]
         )
         policies = policies_allowing("admin", "admin-recorder-audit", ["recorder__*"])
-        with running_gateway(
-            tmp_path,
-            servers_config=servers,
-            policies_config=policies,
-            mint_keys=False,
-            settings_overrides={
-                # Nothing listens on port 1, so every database call fails.
-                "database_url": "postgresql+asyncpg://warden:warden@127.0.0.1:1/warden"
-            },
-        ) as gateway:
+        with running_gateway(tmp_path, servers_config=servers, policies_config=policies) as gateway:
+            async with gateway_client(gateway, gateway.auth("admin")) as client:
+                healthy = await client.call_tool("recorder__echo", {"text": "this one is fine"})
+                assert not healthy.is_error, error_text(healthy)
+
+            connection = sqlite3.connect(sqlite_path(gateway.database_url))
+            try:
+                connection.execute("DROP TABLE audit_events")
+                connection.commit()
+            finally:
+                connection.close()
+
             calls_before = len(seen_headers)
-            token = issue_token(gateway, "carol", ["admin"])
-            async with gateway_client(gateway, {"Authorization": f"Bearer {token}"}) as client:
+            async with gateway_client(gateway, gateway.auth("admin")) as client:
                 result = await client.call_tool("recorder__echo", {"text": "should not arrive"})
 
             assert "WARDEN_DENIED:audit_unavailable" in error_text(result)
             assert result.structured_content is not None
             assert result.structured_content["error"] == "WARDEN_DENIED:audit_unavailable"
 
-            # The handshake itself is HTTP traffic to the upstream, so count only tool calls:
-            # the listing the gateway did at startup is allowed, a forwarded call is not.
-            new_requests = len(seen_headers) - calls_before
-            assert new_requests == 0, (
-                f"the upstream received {new_requests} request(s) after a denied call"
+            # The MCP handshake is HTTP traffic too, so count requests rather than assuming
+            # none: what matters is that no *new* request carried the tool call.
+            bodies = [
+                headers
+                for headers in seen_headers[calls_before:]
+                if headers.get("content-length", "0") not in ("0", "")
+            ]
+            assert not any("should not arrive" in str(headers) for headers in bodies)
+            assert len(seen_headers) - calls_before <= 2, (
+                "only handshake traffic may follow a denied call, never the call itself"
             )
+
+
+async def test_the_gateway_refuses_to_start_when_it_cannot_read_the_pin_table(
+    tmp_path: Path,
+) -> None:
+    """The other half of failing closed: not knowing what is quarantined is not a start-up.
+
+    A gateway that came up without the quarantine list would serve every tool as if it had
+    been approved, which is the one mistake Phase 8 exists to prevent.
+    """
+    from starlette.testclient import TestClient
+
+    from tests.helpers import (
+        test_gateway_config,
+        test_servers_config,
+        test_settings,
+    )
+    from warden.auth.tokens import NullRevocationStore
+    from warden.health import Readiness
+    from warden.main import create_app
+    from warden.policy.store import PolicyStore
+
+    settings = test_settings(
+        tmp_path,
+        database_url="postgresql+asyncpg://warden:warden@127.0.0.1:1/warden",
+    )
+    servers = test_servers_config(tmp_path)
+    app = create_app(
+        settings,
+        readiness=Readiness({}),
+        gateway_config=test_gateway_config(),
+        servers_config=servers,
+        policy_store=PolicyStore.from_config(settings.policies_yaml, servers, None),
+        revocations=NullRevocationStore(),
+        redis=_FakeRedisForStartup(),
+    )
+    with pytest.raises(Exception) as failure, TestClient(app):
+        pass
+    assert "connect" in str(failure.value).lower() or "refused" in str(failure.value).lower()
+
+
+class _FakeRedisForStartup:
+    """Enough of Redis that the limiter can be built; startup fails on Postgres, not here."""
+
+    async def eval(self, *_: object, **__: object) -> object:  # pragma: no cover
+        raise ConnectionError("not used")
+
+    async def aclose(self) -> None:
+        return None
 
 
 # -- the admin API -----------------------------------------------------------------------------

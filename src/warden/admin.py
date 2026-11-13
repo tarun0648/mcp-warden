@@ -21,10 +21,13 @@ from starlette.routing import Route
 
 from warden.audit.log import DEFAULT_PAGE_SIZE, AuditFilters, AuditLog
 from warden.auth.middleware import principal_from_request
+from warden.config import split_namespaced
 from warden.logging import get_logger
 from warden.pipeline import Principal
 from warden.policy.store import PolicyStore
 from warden.ratelimit.limiter import RateLimiter
+from warden.scan.definitions import diff_definitions
+from warden.scan.pinning import PinStore
 from warden.upstream.manager import UpstreamManager
 
 logger = get_logger(__name__)
@@ -32,6 +35,10 @@ logger = get_logger(__name__)
 ADMIN_ROLE = "admin"
 
 Handler = Callable[[Request], Awaitable[Response]]
+
+
+def _bad_request(reason: str) -> Response:
+    return JSONResponse({"error": "bad_request", "error_description": reason}, status_code=400)
 
 
 def forbidden(reason: str) -> Response:
@@ -78,6 +85,7 @@ class AdminDeps:
     upstreams: UpstreamManager
     audit: AuditLog
     limiter: RateLimiter
+    pins: PinStore
 
 
 def build_admin_routes(deps: AdminDeps) -> list[Route]:
@@ -161,8 +169,63 @@ def build_admin_routes(deps: AdminDeps) -> list[Route]:
             )
         return JSONResponse({"user": principal, "usage": await deps.limiter.usage(principal)})
 
+    @require_admin
+    async def list_pins(request: Request) -> Response:
+        status = request.query_params.get("status")
+        rows = await deps.pins.list_pins(status=status)
+        return JSONResponse({"pins": rows, "quarantined": list(deps.pins.quarantined_names)})
+
+    @require_admin
+    async def pin_diff(request: Request) -> Response:
+        parts = split_namespaced(request.path_params["tool"])
+        if parts is None:
+            return _bad_request("the tool must be named <server>__<tool>")
+        pin = await deps.pins.get_pin(*parts)
+        pair = await deps.pins.definitions_for_diff(*parts)
+        if pin is None or pair is None:
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        previous, current = pair
+        scan = pin.get("scan") or {}
+        return JSONResponse(
+            {
+                "tool": pin["name"],
+                "status": pin["status"],
+                "sha256": pin["sha256"],
+                "previous_sha256": scan.get("previous_sha256"),
+                "diff": diff_definitions(previous, current),
+                "scan": {key: value for key, value in scan.items() if key != "previous_definition"},
+            }
+        )
+
+    @require_admin
+    async def approve_pin(request: Request) -> Response:
+        principal = admin_principal(request)
+        assert principal is not None  # require_admin guarantees it
+        parts = split_namespaced(request.path_params["tool"])
+        if parts is None:
+            return _bad_request("the tool must be named <server>__<tool>")
+        if not await deps.pins.approve(*parts, approved_by=principal.user_id):
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        return JSONResponse({"approved": request.path_params["tool"]})
+
+    @require_admin
+    async def quarantine_pin(request: Request) -> Response:
+        principal = admin_principal(request)
+        assert principal is not None
+        parts = split_namespaced(request.path_params["tool"])
+        if parts is None:
+            return _bad_request("the tool must be named <server>__<tool>")
+        reason = request.query_params.get("reason", "quarantined by an operator")
+        if not await deps.pins.quarantine(*parts, by=principal.user_id, reason=reason):
+            return JSONResponse({"error": "not_found"}, status_code=404)
+        return JSONResponse({"quarantined": request.path_params["tool"]})
+
     return [
         Route("/admin/reload", reload_policies, methods=["POST"]),
+        Route("/admin/pins", list_pins, methods=["GET"]),
+        Route("/admin/pins/{tool}", pin_diff, methods=["GET"]),
+        Route("/admin/pins/{tool}/approve", approve_pin, methods=["POST"]),
+        Route("/admin/pins/{tool}/quarantine", quarantine_pin, methods=["POST"]),
         Route("/admin/audit", audit_query, methods=["GET"]),
         Route("/admin/audit/verify", audit_verify, methods=["GET"]),
         Route("/admin/usage", usage, methods=["GET"]),

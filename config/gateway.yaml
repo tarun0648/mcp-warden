@@ -28,7 +28,9 @@ limits:
 scan:
   classifier_enabled: false
   classifier_model: protectai/deberta-v3-base-prompt-injection-v2
-  classifier_threshold: 0.8
+  # Measured, not guessed: see docs/decisions.md. At 0.8 this model flags ordinary
+  # security prose as often as real injections.
+  classifier_threshold: 0.999
   classifier_timeout_seconds: 2.0
   classifier_device: auto
   definition_suspicious_score: 2

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Index, Integer, String, Text
+from sqlalchemy import Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from warden.db.base import Base, JsonColumn, UtcDateTime, utcnow
@@ -139,4 +139,55 @@ class AuditEvent(Base):
         }
 
 
-__all__ = ["ApiKey", "AuditEvent"]
+class ToolPin(Base):
+    """What we have agreed one upstream tool's definition looks like.
+
+    A pin is a promise: this exact definition, by hash, is the one an operator (or the
+    auto-pinning rule for a trusted server) accepted. If the upstream later sends a different
+    definition, the hash no longer matches and the tool is quarantined - that is the rug pull.
+
+    `status` is the gate. `pinned` tools are listed and callable; `quarantined` tools are hidden
+    from `tools/list` and refused on call.
+    """
+
+    __tablename__ = "tool_pins"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    server: Mapped[str] = mapped_column(String(64), nullable=False)
+    tool: Mapped[str] = mapped_column(String(128), nullable=False)
+    #: SHA-256 of the canonical JSON of the accepted definition.
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    #: The scan that produced this status, kept so an operator can see *why* it was quarantined
+    #: without re-running anything.
+    scan: Mapped[dict[str, Any]] = mapped_column(JsonColumn, nullable=False, default=dict)
+    #: The definition itself, so `warden tools diff` can show old against new.
+    definition: Mapped[dict[str, Any]] = mapped_column(JsonColumn, nullable=False, default=dict)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approved_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    first_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("server", "tool", name="uq_tool_pins_server_tool"),
+        Index("ix_tool_pins_status", "status"),
+    )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "server": self.server,
+            "tool": self.tool,
+            "name": f"{self.server}__{self.tool}",
+            "sha256": self.sha256,
+            "status": self.status,
+            "reason": self.reason,
+            "scan": self.scan,
+            "approved_by": self.approved_by,
+            "approved_at": self.approved_at.isoformat() if self.approved_at else None,
+            "first_seen_at": self.first_seen_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+__all__ = ["ApiKey", "AuditEvent", "ToolPin"]

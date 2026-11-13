@@ -10,6 +10,7 @@ import pytest
 
 from tests.conftest import requires_redis
 from tests.helpers import (
+    approve_tool,
     error_text,
     gateway_client,
     payload,
@@ -103,6 +104,7 @@ async def test_an_oversized_result_is_denied_not_truncated(tmp_path: Path) -> No
         policies_config=policies,
         evil_timeout=10.0,
     ) as gateway:
+        approve_tool(gateway, "evil__huge_output")
         async with gateway_client(gateway, gateway.auth("redteam")) as client:
             too_big = await client.call_tool("evil__huge_output", {"kb": 1024})
             just_right = await client.call_tool("evil__huge_output", {"kb": 32})
