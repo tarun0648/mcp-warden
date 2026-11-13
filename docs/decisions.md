@@ -30,3 +30,28 @@ One line per decision, with the reason. Newest last.
   tests run for real there.
 - **Readiness checks run concurrently with a per-check timeout.** A hanging dependency must not
   make `/readyz` itself hang, or the gateway looks alive to a load balancer while it is not.
+
+## Phase 1 — benign upstream servers
+
+- **`run_sql` is guarded four ways, not one.** A parser-level check (single statement, starts with
+  SELECT, no forbidden keyword), a read-only connection URI, a deny-by-default SQLite authorizer,
+  and Python's own `execute()` refusal of multi-statement SQL. Any one of them can be wrong.
+- **Forbidden SQL keywords are matched on word boundaries.** Matching `" delete "` with spaces let
+  `WITH x AS (DELETE ...)` and `load_extension(` through, because the keyword was followed by a
+  paren. Boundary matching also keeps the column name `created` from looking like `CREATE`.
+- **String literals and comments are blanked, not removed, before the keyword check.** Blanking
+  keeps offsets stable, so `WHERE body LIKE '%drop table%'` is allowed while a real `DROP` is not.
+- **A `WITH` statement must contain a SELECT outside its CTE bodies.** Looking for `select`
+  anywhere accepted the incomplete `WITH t AS (SELECT 1)`.
+- **Percent-encoded paths are refused, never decoded.** Decoding is what turns `%2e%2e/x` into
+  traversal; a literal `%` in a sandbox filename is a cost worth paying.
+- **Path safety resolves the deepest existing ancestor and re-appends the rest.** Resolving only
+  the leaf misses a symlinked directory in the middle of the path, and resolving a non-existent
+  leaf would break `write_file`.
+- **Tools raise the SDK's `ToolError`, not `ValueError`.** `ToolError` returns the message to the
+  caller as an `is_error` result and logs at INFO; any other exception becomes
+  `UnexpectedToolError`, whose message is only "Error executing tool X" with a traceback in the
+  server log. Anticipated failures deserve a readable reason.
+- **Tests enter the MCP client inside the test body, not in an async fixture.** The SDK's client is
+  an anyio context manager; entering it in a pytest async fixture and exiting it in the finaliser
+  crosses tasks, which anyio rejects with "cancel scope in a different task".

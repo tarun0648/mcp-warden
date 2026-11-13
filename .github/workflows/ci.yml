@@ -16,7 +16,7 @@ jobs:
       - run: uv sync --all-groups
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      - run: uv run mypy src/warden
+      - run: uv run mypy src/warden servers
 
   unit:
     runs-on: ubuntu-latest

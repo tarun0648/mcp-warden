@@ -28,7 +28,7 @@ fmt: ## Format the code with ruff
 lint: ## Lint (ruff) and type-check (mypy --strict on src/warden)
 	$(RUN) ruff check .
 	$(RUN) ruff format --check .
-	$(RUN) mypy src/warden
+	$(RUN) mypy src/warden servers
 
 test: ## Run unit + integration tests
 	$(RUN) pytest -m "unit or integration" -q
