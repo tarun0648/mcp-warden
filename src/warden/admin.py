@@ -19,6 +19,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
+from warden.approval.store import ApprovalStore
 from warden.audit.log import DEFAULT_PAGE_SIZE, AuditFilters, AuditLog
 from warden.auth.middleware import principal_from_request
 from warden.config import split_namespaced
@@ -86,6 +87,7 @@ class AdminDeps:
     audit: AuditLog
     limiter: RateLimiter
     pins: PinStore
+    approvals: ApprovalStore
 
 
 def build_admin_routes(deps: AdminDeps) -> list[Route]:
@@ -220,8 +222,37 @@ def build_admin_routes(deps: AdminDeps) -> list[Route]:
             return JSONResponse({"error": "not_found"}, status_code=404)
         return JSONResponse({"quarantined": request.path_params["tool"]})
 
+    @require_admin
+    async def list_approvals(request: Request) -> Response:
+        scope = request.query_params.get("status", "pending")
+        if scope == "pending":
+            return JSONResponse({"approvals": await deps.approvals.pending()})
+        return JSONResponse({"approvals": await deps.approvals.recent()})
+
+    @require_admin
+    async def decide_approval(request: Request) -> Response:
+        principal = admin_principal(request)
+        assert principal is not None
+        approval_id = request.path_params["approval_id"]
+        action = request.path_params["action"]
+        if action not in ("approve", "deny"):
+            return _bad_request("action must be approve or deny")
+        reason = request.query_params.get("reason")
+        changed, message = await deps.approvals.decide(
+            approval_id,
+            approve=action == "approve",
+            decided_by=principal.user_id,
+            reason=reason,
+        )
+        return JSONResponse(
+            {"changed": changed, "message": message},
+            status_code=200 if changed else 409,
+        )
+
     return [
         Route("/admin/reload", reload_policies, methods=["POST"]),
+        Route("/admin/approvals", list_approvals, methods=["GET"]),
+        Route("/admin/approvals/{approval_id}/{action}", decide_approval, methods=["POST"]),
         Route("/admin/pins", list_pins, methods=["GET"]),
         Route("/admin/pins/{tool}", pin_diff, methods=["GET"]),
         Route("/admin/pins/{tool}/approve", approve_pin, methods=["POST"]),

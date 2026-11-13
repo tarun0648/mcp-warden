@@ -356,3 +356,56 @@ stronger measurement, and it reports both columns for the same reason.
 - **`ToolPin.as_dict()` deliberately omits the definition.** A definition is attacker-controlled
   text and the pins listing has no reason to carry every poisoned description; only the diff
   endpoint asks for it, through `definitions_for_diff`, and renders both sides via `excerpt`.
+
+## Phase 9 — human approvals
+
+- **An approval is bound to (principal, tool, argument hash) and is single-use.** Those two
+  properties are the whole security model, and both are checked *on use* rather than trusted
+  from creation: an approval is looked up **by** its binding, so a different caller or different
+  arguments simply do not find it. Three tests cover the replay cases — swapped arguments,
+  different caller, second use.
+- **Approving and consuming are compare-and-set updates, not read-then-write.** Two approvers
+  clicking at the same instant produce exactly one decision and the loser is told so; eight
+  concurrent retries of the same call consume one approval and forward one call.
+- **Pending is not a denial.** A call nobody has decided returns `WARDEN_PENDING:approval` with
+  the approval id, because nobody said no. A retry with the same arguments picks the decision
+  up, and a retry *while still pending* reuses the same approval rather than filling the queue
+  with duplicates.
+- **A caller cannot approve their own request.** Without that, "needs approval" means "needs a
+  second click from the same person", which is not a control. The UI hides the button as a
+  courtesy and the store refuses it as the rule — there is a test that forges the form.
+- **The approval stage sits after DLP and before the audit write-ahead.** After DLP, so a call
+  carrying a secret is refused outright rather than put in front of a human to rubber-stamp.
+  Before the write-ahead row, because a call waiting for a human has not started.
+- **Approval lifecycle events go into the same hash-chained audit log.** Approvals are the one
+  security decision a *human* makes; a reviewer asking "who let this through?" should not have
+  to join two tables, and an approval trail that is not tamper-evident is barely a trail.
+- **The consume event is emitted after its transaction commits.** The first version emitted from
+  inside it, which wrote nothing: SQLite serialises writers on the file, so the audit insert
+  deadlocked against the transaction still holding the write lock. On Postgres it would have
+  read uncommitted state instead. Found because a test asserted the event existed.
+- **Redis pub/sub is an optimisation, not a requirement.** A waiter polls every 250 ms and a
+  published decision wakes it immediately; a pub/sub failure is suppressed and the poller takes
+  over, so the feature degrades in latency rather than in correctness. A publish failure also
+  must not fail the decision itself, which has its own test.
+- **Progress notifications only when the client asked.** A `progressToken` is the client saying
+  it wants them; without one the stage sees `None`. Sending is best effort — a client that has
+  gone away must not turn a waiting approval into a failed request.
+- **The UI exchanges the API key for a session cookie.** `HttpOnly`, `SameSite=Strict`,
+  `Path=/approvals`, and `Secure` **only when the request actually arrived over https** (direct
+  or via `X-Forwarded-Proto`). Setting `Secure` unconditionally makes the cookie unusable on
+  plain-http localhost; not setting it in production puts the session on the wire.
+- **A CSRF token on every POST, bound to the session and compared with `compare_digest`.**
+  `SameSite=Strict` already covers the cross-site case in a modern browser; the token is the
+  belt to those braces, and a missing or wrong one is a 403 rather than a silent no-op. A token
+  from one session does not work in another.
+- **Jinja autoescaping on, `StrictUndefined`, and no `|safe` anywhere** — with a test that reads
+  every template and fails if one appears. Every value on that page is attacker-controlled: the
+  tool name, the arguments, the scan evidence, the decision reason. All four have escaping tests.
+- **Sessions live in memory, deliberately.** A single-node approval UI matches the rest of the
+  phase, and the consequence — a restart signs admins out — is the safe direction.
+- **`policies_allowing(..., prepend=True)` exists in the test harness because rule order
+  matters.** The engine takes the first matching allow rule, so a test appending a
+  `require_approval: false` rule for a tool the role could already call never reached it, and
+  the call sat waiting for a human. The fix was in the test; the engine's first-match rule is
+  the documented behaviour.

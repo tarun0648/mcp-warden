@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+#: `await progress(step, message)`. Reporting progress is best effort: the client may have
+#: gone away, and a failed notification must never fail the request.
+ProgressReporter = Callable[[int, str], Awaitable[None]]
+
+
 class Decision(StrEnum):
     """Where the request stands. Anything but ALLOW stops the pipeline."""
 
@@ -77,6 +82,10 @@ class RequestContext:
     #: an innocent key like "body" would otherwise be written to the audit log verbatim - the
     #: very value the gateway just refused to forward.
     redact_paths: set[str] = field(default_factory=set)
+    #: Set by the MCP layer when the client sent a progressToken: `await ctx.progress(n, msg)`.
+    #: None when the client did not ask for progress, which is most of the time - a stage that
+    #: wants to report progress must tolerate its absence.
+    progress: ProgressReporter | None = None
     result: CallToolResult | None = None
     result_bytes: int = 0
     #: Set when the upstream actually ran, so the audit log can tell "denied before forwarding"
@@ -183,6 +192,7 @@ __all__ = [
     "FinishHook",
     "Pipeline",
     "Principal",
+    "ProgressReporter",
     "RequestContext",
     "Stage",
 ]

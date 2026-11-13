@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}warden approvals{% endblock %}</title>
+  {# Pinned, integrity-checked, and the only script on the page. #}
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+          integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+          crossorigin="anonymous" defer></script>
+  <style>
+    :root { color-scheme: light dark; --edge: #8884; --warn: #b4531a; --bad: #a3242b; --ok: #1d6b3f; }
+    * { box-sizing: border-box; }
+    body { font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+           margin: 0; padding: 1.5rem; max-width: 70rem; }
+    h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+    .sub { color: #7a7a7a; margin: 0 0 1.5rem; }
+    .card { border: 1px solid var(--edge); border-radius: 8px; padding: 1rem; margin: 0 0 1rem; }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: baseline;
+           justify-content: space-between; }
+    .tool { font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 600; }
+    .meta { color: #7a7a7a; font-size: .85rem; }
+    pre { background: #8881; padding: .6rem; border-radius: 6px; overflow-x: auto;
+          font-size: .85rem; margin: .5rem 0; }
+    .flags { color: var(--warn); font-size: .85rem; }
+    button { font: inherit; padding: .4rem .9rem; border-radius: 6px; border: 1px solid var(--edge);
+             background: #8881; cursor: pointer; }
+    button.approve { border-color: var(--ok); color: var(--ok); }
+    button.deny { border-color: var(--bad); color: var(--bad); }
+    input[type=text], input[type=password] { font: inherit; padding: .4rem .6rem;
+      border-radius: 6px; border: 1px solid var(--edge); background: transparent; width: 100%; }
+    form.inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0 0; }
+    .notice { border-left: 3px solid var(--ok); padding: .4rem .8rem; margin: 0 0 1rem;
+              background: #8881; }
+    .error { border-left-color: var(--bad); color: var(--bad); }
+    table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+    th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--edge); }
+    .empty { color: #7a7a7a; font-style: italic; }
+  </style>
+</head>
+<body>
+{% block body %}{% endblock %}
+</body>
+</html>

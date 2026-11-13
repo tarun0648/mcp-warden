@@ -190,4 +190,60 @@ class ToolPin(Base):
         }
 
 
-__all__ = ["ApiKey", "AuditEvent", "ToolPin"]
+class Approval(Base):
+    """One human decision about one risky call.
+
+    Bound to the triple (principal, tool, argument hash) and single-use. That binding is what
+    makes an approval un-replayable: it cannot be carried to a different caller, a different
+    tool, or the same tool with different arguments, and once consumed it cannot be used twice.
+
+    The arguments are stored redacted, exactly as in the audit log, because an approver needs to
+    see what they are approving but nobody needs a credential copied into a second table.
+    """
+
+    __tablename__ = "approvals"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    principal_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool: Mapped[str] = mapped_column(String(128), nullable=False)
+    args_redacted: Mapped[dict[str, Any]] = mapped_column(JsonColumn, nullable=False, default=dict)
+    args_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    risk: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    scan_flags: Mapped[dict[str, Any]] = mapped_column(JsonColumn, nullable=False, default=dict)
+    #: pending | approved | denied | expired | consumed
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    request_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime, nullable=False)
+    decided_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+    decision_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_approvals_status", "status"),
+        Index("ix_approvals_binding", "principal_id", "tool", "args_sha256"),
+        Index("ix_approvals_expires_at", "expires_at"),
+    )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "principal_id": self.principal_id,
+            "tool": self.tool,
+            "args_redacted": self.args_redacted,
+            "args_sha256": self.args_sha256,
+            "risk": self.risk,
+            "scan_flags": self.scan_flags,
+            "status": self.status,
+            "request_id": self.request_id,
+            "created_at": self.created_at.isoformat(),
+            "expires_at": self.expires_at.isoformat(),
+            "decided_by": self.decided_by,
+            "decided_at": self.decided_at.isoformat() if self.decided_at else None,
+            "decision_reason": self.decision_reason,
+            "consumed_at": self.consumed_at.isoformat() if self.consumed_at else None,
+        }
+
+
+__all__ = ["ApiKey", "Approval", "AuditEvent", "ToolPin"]

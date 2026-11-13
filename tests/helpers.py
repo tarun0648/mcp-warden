@@ -164,6 +164,11 @@ def test_gateway_config(**overrides: Any) -> Any:
     from warden.config import GatewayConfig
 
     raw = yaml.safe_load((REPO_ROOT / "config" / "gateway.yaml").read_text()) or {}
+    # A two-second approval wait rather than the shipped sixty: a test that accidentally lands
+    # on the approval stage should cost two seconds, not a minute. Tests about the waiting
+    # behaviour itself override this explicitly.
+    raw.setdefault("approval", {})
+    raw["approval"] = {**raw["approval"], "wait_seconds": 2.0}
     raw.update(overrides)
     return GatewayConfig.model_validate(raw)
 
@@ -264,14 +269,23 @@ def repo_policies() -> Any:
     return load_policies_config(REPO_ROOT / "config" / "policies.yaml")
 
 
-def policies_allowing(role: str, rule_id: str, tools: list[str], **rule_fields: Any) -> Any:
-    """The shipped policy plus one extra allow rule, for upstreams that exist only in a test."""
+def policies_allowing(
+    role: str, rule_id: str, tools: list[str], *, prepend: bool = False, **rule_fields: Any
+) -> Any:
+    """The shipped policy plus one extra allow rule, for upstreams that exist only in a test.
+
+    `prepend=True` puts the new rule *first*. That matters whenever the extra rule changes how
+    an already-allowed tool is treated - `require_approval=False`, say - because the engine
+    takes the first matching allow rule whose constraints pass, so an appended rule for a tool
+    the role can already call is never reached.
+    """
     from warden.config import PolicyRule, RolePolicy
 
     base = repo_policies()
     existing = base.roles.get(role)
     rule = PolicyRule(id=rule_id, effect="allow", tools=tools, **rule_fields)
-    rules = [*(existing.rules if existing else []), rule]
+    current = list(existing.rules) if existing else []
+    rules = [rule, *current] if prepend else [*current, rule]
     roles = dict(base.roles)
     roles[role] = RolePolicy(rules=rules, description=existing.description if existing else None)
     return base.model_copy(update={"roles": roles})
@@ -596,3 +610,45 @@ def pin_diff(handle: RunningGateway, tool: str) -> dict[str, Any]:
     )
     assert response.status_code == 200, response.text
     return dict(response.json())
+
+
+def list_approvals(handle: RunningGateway, status: str = "pending") -> list[dict[str, Any]]:
+    """The approval queue, through the admin API."""
+    response = httpx.get(
+        f"{handle.url}/admin/approvals",
+        params={"status": status},
+        headers=handle.auth("admin"),
+        timeout=20,
+    )
+    assert response.status_code == 200, response.text
+    return list(response.json()["approvals"])
+
+
+def decide_approval(
+    handle: RunningGateway,
+    approval_id: str,
+    *,
+    approve: bool = True,
+    role: str = "admin",
+    reason: str | None = None,
+) -> httpx.Response:
+    """Approve or deny through the admin API, as a second admin would."""
+    action = "approve" if approve else "deny"
+    params = {"reason": reason} if reason else {}
+    return httpx.post(
+        f"{handle.url}/admin/approvals/{approval_id}/{action}",
+        params=params,
+        headers=handle.auth(role),
+        timeout=20,
+    )
+
+
+async def wait_for_approval(handle: RunningGateway, *, timeout: float = 20.0) -> dict[str, Any]:
+    """Poll the queue until something is waiting, then return it."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        queue = list_approvals(handle)
+        if queue:
+            return queue[0]
+        await asyncio.sleep(0.1)
+    raise AssertionError("no approval appeared in the queue")

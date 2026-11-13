@@ -73,8 +73,14 @@ async def test_the_daily_destructive_budget_is_separate(tmp_path: Path) -> None:
             "roles": {},
         }
     }
+    # Prepended: the shipped `editor-files-delete` rule matches first otherwise, and it
+    # leaves approval on, so the call would wait for a human instead of hitting the budget.
     policies = policies_allowing(
-        "editor", "editor-delete-no-approval", ["files__delete_file"], require_approval=False
+        "editor",
+        "editor-delete-no-approval",
+        ["files__delete_file"],
+        prepend=True,
+        require_approval=False,
     )
     with running_gateway(
         tmp_path, gateway_overrides=overrides, policies_config=policies

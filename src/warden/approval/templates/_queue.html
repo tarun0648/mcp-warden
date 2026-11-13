@@ -1,0 +1,36 @@
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+{% if not pending %}
+  <p class="empty">Nothing is waiting for approval.</p>
+{% endif %}
+{% for item in pending %}
+  <div class="card">
+    <div class="row">
+      <span class="tool">{{ item.tool }}</span>
+      <span class="meta">{{ item.id[:8] }} &middot; {{ item.risk or "unknown risk" }}</span>
+    </div>
+    <p class="meta">
+      requested by <strong>{{ item.principal_id }}</strong>
+      &middot; expires {{ item.expires_at }}
+      &middot; arguments sha256 {{ item.args_sha256[:16] }}
+    </p>
+    {% if item.scan_flags %}
+      <p class="flags">scanner flags: {{ item.scan_flags }}</p>
+    {% endif %}
+    <pre>{{ item.args_redacted }}</pre>
+    {% if item.principal_id == user_id %}
+      <p class="flags">
+        You requested this call, so you cannot approve it. Another admin must decide.
+      </p>
+    {% else %}
+      <form class="inline" method="post" action="/approvals/decide"
+            hx-post="/approvals/decide" hx-target="#queue" hx-swap="innerHTML">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <input type="hidden" name="approval_id" value="{{ item.id }}">
+        <input type="text" name="reason" placeholder="reason (optional)"
+               style="flex: 1 1 14rem; width: auto">
+        <button class="approve" type="submit" name="action" value="approve">Approve</button>
+        <button class="deny" type="submit" name="action" value="deny">Deny</button>
+      </form>
+    {% endif %}
+  </div>
+{% endfor %}

@@ -16,7 +16,7 @@ from mcp.server.lowlevel.server import Server
 
 from warden.config import GatewayConfig, ServersConfig
 from warden.logging import get_logger, principal_id_var, request_id_var
-from warden.pipeline import Pipeline, Principal, RequestContext
+from warden.pipeline import Pipeline, Principal, ProgressReporter, RequestContext
 from warden.proxy.registry import ToolRegistry
 from warden.proxy.stages import denial_result
 from warden.upstream.manager import UpstreamManager
@@ -84,6 +84,7 @@ def build_mcp_server(deps: GatewayDeps) -> Server[Any]:
             principal=principal,
             tool_name=params.name,
             arguments=dict(params.arguments or {}),
+            progress=_progress_reporter(ctx),
         )
         token = request_id_var.set(request.request_id)
         _bind_log_context(principal)
@@ -110,6 +111,31 @@ def build_mcp_server(deps: GatewayDeps) -> Server[Any]:
 
 def _bind_log_context(principal: Principal | None) -> None:
     principal_id_var.set(principal.user_id if principal else None)
+
+
+def _progress_reporter(ctx: ServerRequestContext[Any]) -> ProgressReporter | None:
+    """A progress callback, but only if the client asked for one.
+
+    A client signals that it wants progress by sending a `progressToken`; without one there is
+    nowhere to send notifications, so stages see `None` and skip reporting. Sending is best
+    effort: a client that has gone away must not turn a waiting approval into a failed request.
+    """
+    token = (ctx.meta or {}).get("progress_token")
+    if token is None:
+        return None
+
+    async def report(step: int, message: str) -> None:
+        try:
+            await ctx.session.send_progress_notification(
+                progress_token=token,
+                progress=float(step),
+                message=message,
+                related_request_id=str(ctx.request_id) if ctx.request_id is not None else None,
+            )
+        except Exception:
+            logger.debug("could not send a progress notification", exc_info=True)
+
+    return report
 
 
 async def _noop(_: Any) -> None:  # pragma: no cover - placeholder for later phases

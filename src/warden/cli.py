@@ -662,6 +662,137 @@ async def _with_pins(work: Any) -> Any:
         await database.dispose()
 
 
+# ----------------------------------------------------------------------------------------------
+# Approvals
+# ----------------------------------------------------------------------------------------------
+
+approvals_app = typer.Typer(help="Human approvals for risky calls.", no_args_is_help=True)
+app.add_typer(approvals_app, name="approvals")
+
+
+async def _with_approvals(work: Any) -> Any:
+    """Run `work(approval_store)` against a short-lived database connection.
+
+    No Redis notifier here: the CLI publishes nothing, so a gateway waiting on an approval sees
+    a CLI decision on its next poll rather than instantly. That is a quarter of a second, and it
+    keeps the CLI free of a Redis dependency.
+    """
+    from warden.approval.store import ApprovalStore
+
+    settings = _settings()
+    gateway = load_gateway_config(settings.gateway_yaml)
+    database = _database()
+    try:
+        store = ApprovalStore(
+            database,
+            expiry_seconds=gateway.approval.expiry_seconds,
+            allow_self_approval=gateway.approval.allow_self_approval,
+        )
+        outcome = work(store)
+        if asyncio.iscoroutine(outcome):
+            return await outcome
+        return outcome
+    finally:
+        await database.dispose()
+
+
+@approvals_app.command("list")
+def approvals_list(
+    all_statuses: Annotated[
+        bool, typer.Option("--all", help="Include decided and expired approvals.")
+    ] = False,
+) -> None:
+    """Show what is waiting for a human."""
+    rows = asyncio.run(
+        _with_approvals(lambda store: store.recent() if all_statuses else store.pending())
+    )
+    table = Table(title="approvals")
+    for column in ("id", "tool", "requested by", "risk", "status", "expires", "decided by"):
+        table.add_column(column, overflow="fold")
+    for row in rows:
+        style = {"pending": "yellow", "approved": "green", "denied": "red"}.get(
+            row["status"], "white"
+        )
+        table.add_row(
+            row["id"][:12],
+            row["tool"],
+            row["principal_id"],
+            row["risk"] or "-",
+            f"[{style}]{row['status']}[/{style}]",
+            row["expires_at"][:19],
+            row["decided_by"] or "-",
+        )
+    console.print(table)
+    if not rows:
+        console.print("[dim]nothing to show[/dim]")
+        return
+    console.print(
+        "[dim]Inspect one with `warden approvals show <id>`, then approve or deny it.[/dim]"
+    )
+
+
+@approvals_app.command("show")
+def approvals_show(
+    approval_id: Annotated[str, typer.Argument(help="The approval id, or its first characters.")],
+) -> None:
+    """Print everything recorded about one approval, including the arguments as stored."""
+    row = asyncio.run(_with_approvals(lambda store: _find(store, approval_id)))
+    if row is None:
+        console.print(f"[yellow]no approval matching {approval_id}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print_json(data=row)
+
+
+async def _find(store: Any, prefix: str) -> Any:
+    """Look up an approval by id or by a unique prefix, so an operator can retype less."""
+    exact = await store.get(prefix)
+    if exact is not None:
+        return exact
+    matches = [row for row in await store.recent(limit=200) if row["id"].startswith(prefix)]
+    return matches[0] if len(matches) == 1 else None
+
+
+@approvals_app.command("approve")
+def approvals_approve(
+    approval_id: Annotated[str, typer.Argument(help="The approval id, or its first characters.")],
+    by: Annotated[str, typer.Option(help="Who is approving. Must not be the requester.")] = "cli",
+    reason: Annotated[str | None, typer.Option(help="Why, for the audit log.")] = None,
+) -> None:
+    """Let a waiting call through."""
+    _decide(approval_id, approve=True, by=by, reason=reason)
+
+
+@approvals_app.command("deny")
+def approvals_deny(
+    approval_id: Annotated[str, typer.Argument(help="The approval id, or its first characters.")],
+    by: Annotated[str, typer.Option(help="Who is denying.")] = "cli",
+    reason: Annotated[str | None, typer.Option(help="Why, for the audit log.")] = None,
+) -> None:
+    """Refuse a waiting call."""
+    _decide(approval_id, approve=False, by=by, reason=reason)
+
+
+def _decide(approval_id: str, *, approve: bool, by: str, reason: str | None) -> None:
+    async def work(store: Any) -> Any:
+        row = await _find(store, approval_id)
+        if row is None:
+            return None, "no such approval"
+        return await store.decide(row["id"], approve=approve, decided_by=by, reason=reason)
+
+    changed, message = asyncio.run(_with_approvals(work))
+    if not changed:
+        console.print(f"[yellow]not applied:[/yellow] {message}")
+        raise typer.Exit(code=1)
+    console.print(f"[green]ok[/green] {approval_id} {message}")
+
+
+@approvals_app.command("expire")
+def approvals_expire() -> None:
+    """Mark overdue pending approvals expired. The gateway does this lazily; this is manual."""
+    expired = asyncio.run(_with_approvals(lambda store: store.expire_due()))
+    console.print(f"[green]ok[/green] expired {len(expired)} approval(s)")
+
+
 def main() -> None:
     try:
         app()

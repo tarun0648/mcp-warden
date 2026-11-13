@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>warden approvals</h1>
+<p class="sub">Destructive tool calls wait here for a human.</p>
+{% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+<div class="card" style="max-width: 32rem">
+  <form method="post" action="/approvals/login">
+    <label for="api_key">Admin API key</label>
+    {# type=password so the key is not shown, and the field is never pre-filled. #}
+    <input type="password" id="api_key" name="api_key" autocomplete="off"
+           spellcheck="false" placeholder="wdn_..." required>
+    <p class="meta">The key is exchanged for a session cookie and is not stored in the page.</p>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}

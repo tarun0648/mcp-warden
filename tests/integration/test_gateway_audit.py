@@ -111,7 +111,11 @@ async def test_a_budget_denial_is_recorded(tmp_path: Path) -> None:
         }
     }
     policies = policies_allowing(
-        "editor", "editor-delete-direct", ["files__delete_file"], require_approval=False
+        "editor",
+        "editor-delete-direct",
+        ["files__delete_file"],
+        prepend=True,
+        require_approval=False,
     )
     with running_gateway(
         tmp_path, gateway_overrides=overrides, policies_config=policies

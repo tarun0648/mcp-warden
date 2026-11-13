@@ -22,7 +22,7 @@ the policy store, the limiter, the audit log or a scanner is unavailable, the ca
 | 6 | Atomic rate limits, daily budgets, output size caps | done |
 | 7 | Insert-only hash-chained audit log | done |
 | 8 | Definition pinning, rug-pull quarantine, DLP, injection scanning | done |
-| 9 | Single-use human approvals with a web UI | not started |
+| 9 | Single-use human approvals with a web UI | done |
 | 10 | OpenTelemetry traces, Prometheus metrics, Grafana | not started |
 | 11 | Red-team suite and latency benchmark | not started |
 | 12 | Local Ollama demo agent and attack scenarios | not started |

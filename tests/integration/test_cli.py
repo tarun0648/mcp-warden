@@ -36,10 +36,22 @@ def cli_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
 
 def invoke(*args: str) -> tuple[int, str]:
+    """Run a CLI command, returning (exit code, everything it printed).
+
+    A non-zero exit always carries the traceback as well as the output: a bare
+    `SystemExit(2)` in an assertion message is not something anyone can debug.
+    """
     result = runner.invoke(app, list(args))
     output = result.stdout
-    if result.exception is not None and result.exit_code != 0 and not output:
-        output = repr(result.exception)
+    if result.exit_code != 0 and result.exception is not None:
+        import traceback
+
+        trace = "".join(
+            traceback.format_exception(
+                type(result.exception), result.exception, result.exception.__traceback__
+            )
+        )
+        output = f"{output}\n--- exit {result.exit_code} ---\n{trace}"
     return result.exit_code, output
 
 
@@ -371,3 +383,135 @@ def test_approving_an_unknown_tool_exits_non_zero(cli_env: Path) -> None:
     code, output = invoke("tools", "approve", "nosuch__tool")
     assert code == 1
     assert "no pin recorded" in output
+
+
+# -- approvals ---------------------------------------------------------------------------------
+
+
+def test_approvals_list_show_approve_and_deny(cli_env: Path) -> None:
+    """The operator's loop for a waiting call, over the CLI."""
+    from tests.helpers import run_async
+
+    invoke("db", "upgrade")
+
+    async def seed() -> list[str]:
+        from warden.approval.store import ApprovalStore
+        from warden.db.engine import Database
+
+        database = Database(f"sqlite+aiosqlite:///{cli_env / 'warden.sqlite3'}")
+        try:
+            store = ApprovalStore(database, expiry_seconds=600.0)
+            ids = []
+            for index, path in enumerate(("a.md", "b.md")):
+                request = await store.create(
+                    principal_id="editor-user",
+                    tool="files__delete_file",
+                    args_redacted={"path": path},
+                    args_sha256=f"{index:064d}",
+                    request_id=f"req-{index}",
+                    risk="destructive",
+                )
+                ids.append(request.id)
+            return ids
+        finally:
+            await database.dispose()
+
+    first, second = run_async(seed)
+
+    code, listed = invoke("approvals", "list")
+    assert code == 0, listed
+    flat = listed.replace("\n", "").replace(" ", "")
+    assert first[:12] in flat
+    assert "files__delete_file" in flat
+    assert "pending" in listed
+
+    code, shown = invoke("approvals", "show", first[:8])
+    assert code == 0, shown
+    assert "files__delete_file" in shown
+    assert "editor-user" in shown
+
+    code, approved = invoke("approvals", "approve", first[:8], "--by", "alice", "--reason", "ok")
+    assert code == 0, approved
+    assert "approved" in approved
+
+    code, denied = invoke("approvals", "deny", second[:8], "--by", "alice")
+    assert code == 0, denied
+    assert "denied" in denied
+
+    code, again = invoke("approvals", "approve", first[:8], "--by", "alice")
+    assert code == 1
+    assert "not applied" in again
+
+    code, after = invoke("approvals", "list")
+    assert "nothing to show" in after
+
+    code, everything = invoke("approvals", "list", "--all")
+    assert code == 0
+    assert "approved" in everything and "denied" in everything
+
+
+def test_approvals_cli_refuses_self_approval(cli_env: Path) -> None:
+    from tests.helpers import run_async
+
+    invoke("db", "upgrade")
+
+    async def seed() -> str:
+        from warden.approval.store import ApprovalStore
+        from warden.db.engine import Database
+
+        database = Database(f"sqlite+aiosqlite:///{cli_env / 'warden.sqlite3'}")
+        try:
+            store = ApprovalStore(database, expiry_seconds=600.0)
+            request = await store.create(
+                principal_id="alice",
+                tool="files__delete_file",
+                args_redacted={"path": "a.md"},
+                args_sha256="0" * 64,
+                request_id="req-1",
+                risk="destructive",
+            )
+            return request.id
+        finally:
+            await database.dispose()
+
+    approval_id = run_async(seed)
+    code, output = invoke("approvals", "approve", approval_id, "--by", "alice")
+    assert code == 1
+    assert "may not approve their own" in output
+
+
+def test_approvals_show_and_approve_reject_an_unknown_id(cli_env: Path) -> None:
+    invoke("db", "upgrade")
+    for args in (("approvals", "show", "nope"), ("approvals", "approve", "nope")):
+        code, output = invoke(*args)
+        assert code == 1, output
+        assert "no approval" in output or "no such approval" in output
+
+
+def test_approvals_expire_sweeps_the_queue(cli_env: Path) -> None:
+    from tests.helpers import run_async
+
+    invoke("db", "upgrade")
+
+    async def seed() -> None:
+        from warden.approval.store import ApprovalStore
+        from warden.db.engine import Database
+
+        database = Database(f"sqlite+aiosqlite:///{cli_env / 'warden.sqlite3'}")
+        try:
+            store = ApprovalStore(database, expiry_seconds=-1.0)
+            await store.create(
+                principal_id="editor-user",
+                tool="files__delete_file",
+                args_redacted={"path": "a.md"},
+                args_sha256="0" * 64,
+                request_id="req-1",
+                risk="destructive",
+            )
+        finally:
+            await database.dispose()
+
+    run_async(seed)
+    code, output = invoke("approvals", "expire")
+    assert code == 0, output
+    assert "expired 1 approval" in output

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="row">
+  <div>
+    <h1>warden approvals</h1>
+    <p class="sub">Signed in as <strong>{{ user_id }}</strong>.</p>
+  </div>
+  <form method="post" action="/approvals/logout">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit">Sign out</button>
+  </form>
+</div>
+
+<h2 style="font-size:1rem">Waiting</h2>
+{# Polled rather than pushed: a page that silently stops updating is worse than one that
+   refetches a small fragment every two seconds. #}
+<div id="queue" hx-get="/approvals/queue" hx-trigger="every 2s" hx-swap="innerHTML">
+  {% include "_queue.html" %}
+</div>
+
+<h2 style="font-size:1rem">Recently decided</h2>
+{% if not recent %}
+  <p class="empty">Nothing decided yet.</p>
+{% else %}
+<table>
+  <thead><tr><th>id</th><th>tool</th><th>requested by</th><th>status</th><th>decided by</th><th>reason</th></tr></thead>
+  <tbody>
+  {% for item in recent %}
+    <tr>
+      <td>{{ item.id[:8] }}</td>
+      <td class="tool">{{ item.tool }}</td>
+      <td>{{ item.principal_id }}</td>
+      <td>{{ item.status }}</td>
+      <td>{{ item.decided_by or "-" }}</td>
+      <td>{{ item.decision_reason or "-" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

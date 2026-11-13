@@ -124,6 +124,53 @@ class AuditLog:
             )
             raise AuditUnavailable(str(exc)) from exc
 
+    async def record_approval_event(self, event: str, approval: dict[str, Any]) -> None:
+        """Append a row for an approval lifecycle moment.
+
+        Approvals are the one security decision a *human* makes, so they belong in the same
+        hash-chained log as everything else: a reviewer asking "who let this through?" should
+        not have to join two tables, and an approval trail that is not tamper-evident is not
+        much of a trail.
+        """
+        try:
+            await self.append(
+                request_id=str(approval.get("request_id") or approval.get("id") or ""),
+                event=event,
+                principal_id=approval.get("decided_by") or approval.get("principal_id"),
+                auth_method="approval",
+                method="approvals/decide",
+                tool=approval.get("tool"),
+                upstream=None,
+                risk=approval.get("risk"),
+                # Already redacted when the approval was created.
+                args_redacted=dict(approval.get("args_redacted") or {}),
+                args_sha256=str(approval.get("args_sha256") or ""),
+                decision=str(approval.get("status") or ""),
+                reason_code=event,
+                matched_rule=None,
+                stage_timings_ms={},
+                result_bytes=0,
+                scan_flags={
+                    "approval": {
+                        "id": approval.get("id"),
+                        "requested_by": approval.get("principal_id"),
+                        "decided_by": approval.get("decided_by"),
+                        "reason": approval.get("decision_reason"),
+                    }
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "approval event could not be recorded",
+                extra={
+                    "warden": {
+                        "event": event,
+                        "approval_id": approval.get("id"),
+                        "error": f"{type(exc).__name__}: {exc}"[:200],
+                    }
+                },
+            )
+
     async def record_outcome(self, ctx: RequestContext) -> None:
         """Write the closing row, best effort.
 

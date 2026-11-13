@@ -23,6 +23,9 @@ from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from warden.admin import AdminDeps, build_admin_routes, install_sighup_reload
+from warden.approval.stage import Approval
+from warden.approval.store import ApprovalStore
+from warden.approval.web import build_approval_routes
 from warden.audit.log import AuditLog
 from warden.audit.stage import AuditWriteAhead, audit_finish_hook
 from warden.auth.api_keys import ApiKeyStore
@@ -223,19 +226,23 @@ def build_pipeline_factory(
     pins: PinStore,
     scan_config: ScanConfig,
     output_scanner: OutputScanner,
+    approvals: ApprovalStore,
+    approval_wait_seconds: float,
 ) -> Callable[[], Pipeline]:
     """The pipeline, in the one order that is the security contract.
 
-    Phase 8 completes the order CLAUDE.md specifies: authenticate, resolve, definitions,
-    policy, ratelimit, dlp, audit (write-ahead), forward, output_limit, output_scan - with the
-    audit writer as a finish hook so every request leaves a record whatever happens. Phase 9
-    inserts Approval between dlp and audit.
+    The full order CLAUDE.md specifies: authenticate, resolve, definitions, policy, ratelimit,
+    dlp, approval, audit (write-ahead), forward, output_limit, output_scan - with the audit
+    writer as a finish hook so every request leaves a record whatever happens.
 
-    Two placements are deliberate:
+    Three placements are deliberate:
 
     * `definitions` runs before `policy`, so a quarantined tool is refused for the same reason
       whoever asks, rather than reporting "no permission" to one caller and "quarantined" to
       another.
+    * `approval` runs after `dlp`, so a call that carries a secret is refused outright rather
+      than put in front of a human to rubber-stamp; and before the write-ahead row, because a
+      call waiting for a human has not started.
     * the write-ahead row is the last thing before `forward`: everything that can refuse the
       call cheaply has already run, so the log is not filled with rows for calls that were
       never going to happen, and nothing that *can* reach an upstream runs before it.
@@ -246,6 +253,7 @@ def build_pipeline_factory(
     policy = Policy(policies)
     ratelimit = RateLimit(limiter, limits)
     dlp = ArgumentDLP(scan_config)
+    approval = Approval(approvals, wait_seconds=approval_wait_seconds)
     write_ahead = AuditWriteAhead(audit)
     forward = ForwardToUpstream(upstreams)
     output_limit = OutputLimit(limits)
@@ -261,6 +269,7 @@ def build_pipeline_factory(
                 policy,
                 ratelimit,
                 dlp,
+                approval,
                 write_ahead,
                 forward,
                 output_limit,
@@ -370,6 +379,13 @@ def create_app(
             timeout_seconds=gateway.scan.classifier_timeout_seconds,
         )
     )
+    approvals = ApprovalStore(
+        db,
+        notifier=redis_client,
+        expiry_seconds=gateway.approval.expiry_seconds,
+        allow_self_approval=gateway.approval.allow_self_approval,
+        on_event=audit.record_approval_event,
+    )
     pins = PinStore(db, DefinitionScanner(gateway.scan, classifier))
     output_scanner = OutputScanner(gateway.scan, classifier)
     trusted = [upstream.name for upstream in servers.upstreams if upstream.trusted]
@@ -406,9 +422,11 @@ def create_app(
                 audit=audit,
                 limiter=limiter,
                 pins=pins,
+                approvals=approvals,
             )
         )
     )
+    routes.extend(build_approval_routes(approvals=approvals, api_keys=ApiKeyStore(db)))
     routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
     routes.append(
         Route(PROTECTED_RESOURCE_PATH, make_protected_resource_metadata(settings), methods=["GET"])
@@ -435,6 +453,8 @@ def create_app(
                 pins,
                 gateway.scan,
                 output_scanner,
+                approvals,
+                gateway.approval.wait_seconds,
             ),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
             tool_filter=build_tool_filter(policies, pins),
@@ -503,6 +523,7 @@ def create_app(
     app.state.limiter = limiter
     app.state.audit = audit
     app.state.pins = pins
+    app.state.approvals = approvals
     app.state.classifier = classifier
     app.state.redis = redis_client
     app.state.readiness = checks
