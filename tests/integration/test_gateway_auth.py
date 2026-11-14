@@ -135,6 +135,34 @@ async def test_protected_resource_metadata_is_public(tmp_path: Path) -> None:
     assert body["bearer_methods_supported"] == ["header"]
 
 
+async def test_metadata_is_served_where_rfc_9728_says_to_look(tmp_path: Path) -> None:
+    """The resource is `<origin>/mcp`, so the metadata lives under `.../oauth-protected-resource/mcp`.
+
+    RFC 9728 section 3.1 inserts the well-known segment between the host and the resource's
+    path. Serving only the bare path makes every OAuth-capable client's first request a 404;
+    the MCP Inspector is the one that found this.
+    """
+    with running_gateway(tmp_path) as gateway:
+        path_aware = http_get(f"{gateway.url}/.well-known/oauth-protected-resource/mcp")
+        bare = http_get(f"{gateway.url}/.well-known/oauth-protected-resource")
+    assert path_aware.status_code == 200, "RFC 9728 location is not served"
+    assert path_aware.json() == bare.json(), "the two locations must describe the same resource"
+
+
+async def test_the_challenge_points_at_the_metadata_that_exists(tmp_path: Path) -> None:
+    """A `resource_metadata` URL that 404s sends the client nowhere."""
+    with running_gateway(tmp_path) as gateway:
+        response = http_get(f"{gateway.url}/mcp")
+        assert response.status_code == 401
+        challenge = response.headers["www-authenticate"]
+        advertised = challenge.split('resource_metadata="', 1)[1].split('"', 1)[0]
+        # Follow it exactly as a client would, against this gateway's own host.
+        path = advertised.split("/", 3)[3]
+        followed = http_get(f"{gateway.url}/{path}")
+    assert followed.status_code == 200, f"{advertised} does not resolve"
+    assert followed.json()["resource"].endswith("/mcp")
+
+
 async def test_health_endpoints_stay_public(tmp_path: Path) -> None:
     with running_gateway(tmp_path) as gateway:
         assert http_get(f"{gateway.url}/healthz").status_code == 200

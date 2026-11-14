@@ -240,3 +240,55 @@ async def test_an_optional_path_still_rejects_a_wrong_credential(
     with TestClient(app) as client:
         response = client.get("/metrics", headers={"Authorization": "Bearer wdn_" + "x" * 32})
     assert response.status_code == 401
+
+
+# -- where the metadata lives (RFC 9728 section 3.1) --------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("resource", "expected"),
+    [
+        ("http://localhost:8080/mcp", "/.well-known/oauth-protected-resource/mcp"),
+        ("https://gw.example.com/mcp", "/.well-known/oauth-protected-resource/mcp"),
+        ("https://gw.example.com/a/b", "/.well-known/oauth-protected-resource/a/b"),
+        # A trailing slash is stripped before the suffix is inserted, per section 3.1.
+        ("https://gw.example.com/mcp/", "/.well-known/oauth-protected-resource/mcp"),
+    ],
+)
+def test_the_resource_path_is_appended_to_the_well_known_segment(
+    resource: str, expected: str
+) -> None:
+    from warden.main import protected_resource_paths
+
+    assert protected_resource_paths(resource)[0] == expected
+
+
+@pytest.mark.parametrize("resource", ["https://gw.example.com", "https://gw.example.com/"])
+def test_a_resource_with_no_path_uses_the_bare_well_known_path(resource: str) -> None:
+    from warden.main import PROTECTED_RESOURCE_PATH, protected_resource_paths
+
+    assert protected_resource_paths(resource) == (PROTECTED_RESOURCE_PATH,)
+
+
+def test_the_bare_path_is_also_served_for_a_client_given_only_the_origin() -> None:
+    from warden.main import PROTECTED_RESOURCE_PATH, protected_resource_paths
+
+    paths = protected_resource_paths("https://gw.example.com/mcp")
+    assert PROTECTED_RESOURCE_PATH in paths
+    assert paths[0] != PROTECTED_RESOURCE_PATH, "the specific location comes first"
+
+
+def test_the_advertised_metadata_url_is_absolute_and_drops_the_resource_path() -> None:
+    """It must be the metadata document's URL, not the resource's."""
+    from warden.main import protected_resource_metadata_url
+
+    url = protected_resource_metadata_url("https://gw.example.com:8443/mcp")
+    assert url == "https://gw.example.com:8443/.well-known/oauth-protected-resource/mcp"
+
+
+def test_a_port_and_scheme_survive_into_the_advertised_url() -> None:
+    from warden.main import protected_resource_metadata_url
+
+    assert protected_resource_metadata_url("http://127.0.0.1:8080/mcp").startswith(
+        "http://127.0.0.1:8080/"
+    )

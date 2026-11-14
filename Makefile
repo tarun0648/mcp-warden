@@ -1,9 +1,10 @@
 # mcp-warden developer tasks. Run `make help` for the list.
 .DEFAULT_GOAL := help
 UV ?= uv
+SCENARIO ?= all
 RUN := $(UV) run
 
-.PHONY: help setup up down logs fmt lint test test-unit test-integration test-all cov run inspector redteam bench demo soak readme-results clean
+.PHONY: help setup up down logs fmt lint test test-unit test-integration test-all cov run inspector redteam bench demo demo-real demo-once soak readme-results clean
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -54,8 +55,8 @@ cov: ## Run unit + integration tests with the coverage gate on src/warden
 run: ## Run the gateway on $$WARDEN_PORT (default 8080)
 	$(RUN) warden serve
 
-inspector: ## Launch the MCP Inspector against the running gateway
-	npx @modelcontextprotocol/inspector
+inspector: ## Launch the MCP Inspector web UI (add the gateway + header in the UI; see docs/clients.md)
+	npx -y @modelcontextprotocol/inspector
 
 redteam: ## Run the red-team suite (both configurations) and write results/
 	$(RUN) python -m redteam.runner
@@ -66,7 +67,13 @@ redteam-rules: ## Run the red-team suite rules-only, as CI does
 bench: ## Run the latency benchmark and write results/
 	$(RUN) python -m bench.latency
 
-demo: ## Run one Ollama demo scenario: make demo SCENARIO=benign
+demo: ## Run the demo scenarios with the scripted model and write results/: make demo SCENARIO=benign
+	$(RUN) python -m agent.runner --scenario $(SCENARIO)
+
+demo-real: ## Same, driven by a local Ollama model (needs `ollama pull $$OLLAMA_MODEL`)
+	$(RUN) python -m agent.runner --scenario $(SCENARIO) --real-model
+
+demo-once: ## One scenario, one run, printed step by step rather than written to results/
 	$(RUN) python -m agent.demo_agent --scenario $(SCENARIO)
 
 soak: ## Run the 30-minute soak test and write results/

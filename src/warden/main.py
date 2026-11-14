@@ -74,6 +74,39 @@ MCP_PATH = "/mcp"
 JWKS_PATH = "/.well-known/jwks.json"
 METRICS_PATH = "/metrics"
 PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
+
+
+def protected_resource_paths(resource_url: str) -> tuple[str, ...]:
+    """Where RFC 9728 metadata for `resource_url` must be served.
+
+    RFC 9728 section 3.1 inserts `/.well-known/oauth-protected-resource` *between the host and
+    the path* of the resource identifier, so a resource of `http://host:8080/mcp` publishes its
+    metadata at `/.well-known/oauth-protected-resource/mcp`, not at the bare well-known path.
+    Serving only the bare path is what the MCP Inspector trips over, and it is the first thing
+    any OAuth-capable client does.
+
+    Both are returned, most specific first. The bare path is kept because a client that was
+    given the origin rather than the full endpoint asks for it, and because that is the correct
+    location for a deployment whose resource URL has no path at all; in that case the two
+    collapse to one entry.
+    """
+    from urllib.parse import urlsplit
+
+    path = urlsplit(resource_url).path.rstrip("/")
+    if not path:
+        return (PROTECTED_RESOURCE_PATH,)
+    return (f"{PROTECTED_RESOURCE_PATH}{path}", PROTECTED_RESOURCE_PATH)
+
+
+def protected_resource_metadata_url(resource_url: str) -> str:
+    """The absolute URL to advertise in `WWW-Authenticate: ... resource_metadata=`."""
+    from urllib.parse import urlsplit, urlunsplit
+
+    parts = urlsplit(resource_url)
+    origin = urlunsplit((parts.scheme, parts.netloc, "", "", ""))
+    return f"{origin}{protected_resource_paths(resource_url)[0]}"
+
+
 #: Paths that require a credential. Public by design: the health checks (a load balancer has no
 #: credential) and the two well-known documents (a client must read them to get one).
 PROTECTED_PREFIXES = (MCP_PATH, "/admin")
@@ -527,9 +560,9 @@ def create_app(
                 methods=["GET"],
             )
         )
-    routes.append(
-        Route(PROTECTED_RESOURCE_PATH, make_protected_resource_metadata(settings), methods=["GET"])
-    )
+    metadata_handler = make_protected_resource_metadata(settings)
+    for well_known in protected_resource_paths(settings.warden_resource_url):
+        routes.append(Route(well_known, metadata_handler, methods=["GET"]))
 
     mcp_server: Server[object] | None = None
     session_manager: StreamableHTTPSessionManager | None = None
@@ -614,9 +647,7 @@ def create_app(
         authenticator=authenticator,
         protected_prefixes=PROTECTED_PREFIXES,
         optional_prefixes=OPTIONAL_AUTH_PREFIXES,
-        resource_metadata_url=(
-            f"{settings.warden_resource_url.rsplit('/mcp', 1)[0]}{PROTECTED_RESOURCE_PATH}"
-        ),
+        resource_metadata_url=protected_resource_metadata_url(settings.warden_resource_url),
     )
     app.add_middleware(RequestIdMiddleware)
     app.state.settings = settings
@@ -653,4 +684,6 @@ __all__ = [
     "build_upstream_manager",
     "create_app",
     "default_readiness",
+    "protected_resource_metadata_url",
+    "protected_resource_paths",
 ]

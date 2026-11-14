@@ -25,7 +25,7 @@ the policy store, the limiter, the audit log or a scanner is unavailable, the ca
 | 9 | Single-use human approvals with a web UI | done |
 | 10 | OpenTelemetry traces, Prometheus metrics, Grafana | done |
 | 11 | Red-team suite and latency benchmark | done |
-| 12 | Local Ollama demo agent and attack scenarios | not started |
+| 12 | Local Ollama demo agent and attack scenarios | done |
 | 13 | Hardening, threat model, docs, v0.1.0 | not started |
 
 ## Setup on macOS
@@ -53,7 +53,8 @@ Run `make help` for the full list. The ones you need most:
 | `make test` | Unit + integration tests |
 | `make test-all` | Every layer, including e2e, ml, redteam and perf |
 | `make run` | Run the gateway |
-| `make inspector` | Point the MCP Inspector at the running gateway |
+| `make inspector` | Launch the MCP Inspector web UI - see [docs/clients.md](docs/clients.md) |
+| `make demo` | Run the attack scenarios and write `results/demo-*.md` |
 | `make redteam` / `make bench` | Write measured results into `results/` |
 
 ## Layout
@@ -64,7 +65,7 @@ servers/      upstream MCP servers we own (notes_db, files, and evil for tests o
 redteam/      attack and benign cases plus the runner
 bench/        latency benchmark
 config/       gateway.yaml, servers.yaml, policies.yaml
-docs/         architecture.md, threat-model.md, decisions.md
+docs/         architecture.md, threat-model.md, decisions.md, clients.md
 results/      machine-written benchmark and red-team output
 ```
 

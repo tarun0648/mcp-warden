@@ -543,3 +543,101 @@ decide on its own.
   credential is accepted and the MCP layer then refuses the request for not being an initialised
   session. 400 rather than 401 *is* the proof that authentication passed, and the case now says
   so.
+
+
+## Phase 12 - the demo agent and the attack scenarios
+
+### Judging the gateway, not the model
+
+- **The scenarios are driven by a scripted model, and that is what makes them tests.** A 7B
+  model takes the bait inconsistently: sometimes it follows an injected instruction, sometimes
+  it notices and refuses. A scenario driven by a real model can show the system working but
+  cannot *assert* anything, because "the bad thing did not happen" has two explanations and
+  only one of them is the gateway. `ScriptedLLM` always takes the bait, which turns every
+  scenario into a question with an answer: the forbidden call was made, and the gateway either
+  refused it or did not.
+- **Every report counts both numbers.** How often the model attempted the forbidden tool is a
+  property of the model, reported for context; how often the gateway refused is the property
+  under test. Reporting only the second would let a scenario where the model never tried look
+  identical to one where the gateway blocked five attempts. `results/demo-*.md` prints them as
+  separate rows and says in prose why they are different kinds of fact.
+- **The real-model runs assert less, on purpose.** `tests/e2e/test_demo_agent_ollama.py` is
+  conditional: whatever the model attempted, the gateway's answer must have been right, and a
+  run where it did not take the bait *skips* rather than passes. Requiring a 7B model to
+  misbehave would mean tuning the prompt until it did, which is the number-fitting hard rule 7
+  exists to prevent. The one exception is the benign scenario, where the model is expected to
+  succeed - a gateway that blocks ordinary work is worth failing over.
+- **The scenario harness has a test that it can fail.** `test_a_failing_expectation_is_reported_
+  not_swallowed` alters a scenario to demand a reason code the gateway will not produce and
+  asserts the run comes back failed. A harness that always passes is not a harness, and this is
+  the cheapest possible guard against one.
+
+### The agent is a client, and treats the gateway's output as untrusted too
+
+- **Schema conversion drops what a small model cannot use.** `$ref`, `$defs`, `allOf`/`oneOf`/
+  `anyOf` and friends are removed rather than passed through, because an unresolved `$ref`
+  makes a model ignore the whole schema - worse than an absent constraint. A property that is
+  nothing but a `$ref` becomes an open object rather than disappearing.
+- **The agent cleans descriptions even though the gateway already scanned them.** Invisible
+  characters are stripped, newlines collapsed, length capped. This is not redundant: the agent
+  is a *client*, and a client that trusts its server completely is the thing this whole project
+  argues against. The cleaning is deliberately not censorship - `<IMPORTANT>` survives as
+  visible text, because making an injection visible is the agent's job and refusing it is the
+  gateway's.
+- **The transcript records the definitions handed to the model, not the ones the upstream
+  wrote.** Otherwise "the poisoned description never reached the model" is an assertion nobody
+  can check.
+- **A gateway denial is fed back to the model as the tool's result.** It is information the
+  model should act on, not an error to hide from it. The transcript distinguishes
+  `allowed` / `denied` / `pending` / `upstream_error`, and an upstream error is never counted
+  as a gateway denial - crediting the gateway for a tool that merely crashed would be the worst
+  kind of wrong number.
+
+### `SeedFile`: hostile content does not arrive through the gateway
+
+The exfiltration scenario's note contains a credential, and writing it *through* the gateway is
+refused by the DLP stage - correct behaviour, with its own red-team case, but it made the
+scenario unsetuppable. `SeedFile` writes such content straight to disk. This is also the more
+faithful model: hostile content usually arrives by a human pasting it, a sync dropping it in or
+a repository being checked out, and the agent then *reads* it through the gateway. That read is
+the part under test.
+
+### Found by connecting a real client
+
+- **The protected-resource metadata was at the wrong URL.** RFC 9728 section 3.1 inserts
+  `/.well-known/oauth-protected-resource` *between the host and the resource's path*, so a
+  resource of `http://localhost:8080/mcp` publishes at
+  `/.well-known/oauth-protected-resource/mcp`. The gateway served, and advertised in its
+  `WWW-Authenticate` challenge, only the bare path - which is every OAuth-capable client's
+  first request and a 404. The MCP Inspector found it in the first minute of being pointed at
+  the gateway. Both locations are now served, the specific one is advertised, and
+  `protected_resource_paths` has unit tests over the path-insertion rule including the
+  trailing-slash case.
+- **`localhost` and `127.0.0.1` are not interchangeable to a client.** The Inspector refused to
+  connect with `Protected resource http://localhost:8080/mcp does not match expected
+  http://127.0.0.1:8080/mcp`, because it compares the resource identifier against the URL it
+  was given. This is correct client behaviour - the check exists so a token minted for one
+  resource cannot be replayed at another - and `docs/clients.md` now says to use one spelling
+  everywhere.
+- **Known limitation, not fixed: the gateway advertises an authorization server it does not
+  run.** `authorization_servers` names the gateway itself, but there is no
+  `/.well-known/oauth-authorization-server`, `/authorize`, `/token` or `/register` (all 404,
+  checked). An OAuth-capable client therefore walks the discovery chain correctly and dies at
+  `Dynamic Client Registration rejected (HTTP 404)`. Every client must be given a pre-issued
+  key or token in a header instead. Implementing an OAuth 2.1 authorization server is well
+  outside what the plan asks for, and quietly dropping `authorization_servers` would change the
+  auth story the project documents, so this is recorded rather than patched over - hard rule 10.
+
+### What `docs/clients.md` does and does not claim
+
+Each client section states whether the steps were run against this gateway or taken from the
+vendor's documentation. The Inspector's CLI and web UI were driven here, down to the exit codes
+and the exact denial payload; Cursor and Claude Desktop were not, and say so. Claude Desktop in
+particular *cannot* reach a localhost gateway at all, because its remote connectors are opened
+from Anthropic's infrastructure rather than from the user's machine - so the honest instruction
+is a stdio bridge or a public hostname, not a config snippet that looks plausible and fails.
+
+Two verification attempts for the `mcp-remote` stdio bridge were blocked by this environment's
+own safety tooling (passing an API key into a third-party npm package), so that path is
+documented from its own README and labelled unverified rather than described as if it had been
+run.
