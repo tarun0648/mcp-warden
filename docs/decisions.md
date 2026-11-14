@@ -443,6 +443,21 @@ stronger measurement, and it reports both columns for the same reason.
 - **The gateway uses its own `CollectorRegistry`, not the global default.** Two gateways in one
   test process would otherwise collide on metric names, and a test asserting that a counter
   moved needs to know which gateway moved it.
+- **The Jaeger image pin was wrong and the compose stack would not start.**
+  `jaegertracing/all-in-one:1.62` does not exist - the tags carry a patch component
+  (`1.62.0`) - and because `docker compose up` aborts on the first image it cannot resolve, the
+  bad pin also interrupted the Prometheus and Grafana pulls. Now pinned to `1.76.0`, with all
+  three tags checked against the registry rather than assumed. Verified end to end: Jaeger,
+  Prometheus and Grafana all report healthy, Prometheus scrapes the gateway
+  (`host.docker.internal:8080` -> up), the provisioned datasource is default, the `mcp-warden`
+  dashboard loads, and **every one of its ten panel queries returns series** rather than
+  parsing and finding nothing.
+- **A real trace was read back out of Jaeger, not merely exported to it.** One `tools/call`
+  produced a 15-span trace: the SDK's SERVER span, the gateway's own span, all ten pipeline
+  stage spans, the gateway's outbound client span, and **the upstream server's own span** -
+  which is the proof that W3C context propagation to a stdio upstream works, since nothing in
+  this gateway creates that span. The same trace was then grepped for the API key, the SQL text
+  and note content: none present.
 - **Grafana runs with anonymous viewer access in compose.** Local development only: the
   dashboard is read-only, carries no secrets, and a login prompt in front of a localhost
   dashboard is friction without security. Noted here so it is a decision rather than an
