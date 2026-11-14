@@ -435,7 +435,7 @@ def write_report(
 # ----------------------------------------------------------------------------------------------
 
 
-AUTH_POLICY_STAGES = ("authenticate", "resolve", "policy", "forward")
+AUTH_POLICY_STAGES = ("authenticate", "resolve", "defaults", "policy", "forward")
 
 #: Limits raised far above the shipped defaults for the duration of the benchmark.
 #:

@@ -67,11 +67,10 @@ MIX: tuple[tuple[str, dict[str, Any], str], ...] = (
     ("notes_db__get_note", {"note_id": 2}, "allowed"),
     ("notes_db__search_notes", {"query": "threat"}, "allowed"),
     ("notes_db__get_note", {"note_id": 3}, "allowed"),
-    # `path` is passed explicitly. The tool declares it optional with a default of ".", but a
-    # policy constraint on an *absent* argument denies (fail-closed), so `{}` is refused. That
-    # is a real false positive, recorded under Known gaps in docs/threat-model.md - the soak
-    # measures the gateway's stability, not that gap.
-    ("files__list_files", {"path": "."}, "allowed"),
+    # No arguments: `path` is left to the schema's default, which the gateway fills before
+    # policy. The first 30-minute run passed `{"path": "."}` because this call was then a false
+    # positive; that run's JSON records the mix it used.
+    ("files__list_files", {}, "allowed"),
     ("notes_db__get_note", {"note_id": 4}, "allowed"),
     ("files__read_file", {"path": "soak.md"}, "allowed"),
     ("files__read_file", {"path": "../../etc/passwd"}, "denied"),

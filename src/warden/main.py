@@ -53,6 +53,7 @@ from warden.health import Readiness, postgres_check, redis_check
 from warden.http_limits import RequestLimitsMiddleware
 from warden.logging import configure_logging, get_logger, request_id_var
 from warden.pipeline import Pipeline, Principal
+from warden.policy.defaults import ApplySchemaDefaults
 from warden.policy.stage import Policy
 from warden.policy.store import PolicyStore
 from warden.proxy.registry import ToolRegistry
@@ -349,6 +350,9 @@ def build_pipeline_factory(
     * `definitions` runs before `policy`, so a quarantined tool is refused for the same reason
       whoever asks, rather than reporting "no permission" to one caller and "quarantined" to
       another.
+    * `defaults` sits between them: after `definitions`, so it only ever reads a pinned
+      definition; before `policy`, so the constraints check the arguments that will actually
+      be forwarded, including any the caller left to the schema's default.
     * `approval` runs after `dlp`, so a call that carries a secret is refused outright rather
       than put in front of a human to rubber-stamp; and before the write-ahead row, because a
       call waiting for a human has not started.
@@ -359,6 +363,7 @@ def build_pipeline_factory(
     authenticate = Authenticate()
     resolve = ResolveTool(registry, servers_config)
     definitions = DefinitionIntegrity(pins)
+    defaults = ApplySchemaDefaults(registry)
     policy = Policy(policies)
     ratelimit = RateLimit(limiter, limits)
     dlp = ArgumentDLP(scan_config)
@@ -378,6 +383,7 @@ def build_pipeline_factory(
                 authenticate,
                 resolve,
                 definitions,
+                defaults,
                 policy,
                 ratelimit,
                 dlp,

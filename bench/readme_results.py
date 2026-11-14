@@ -21,7 +21,9 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_DIR = REPO_ROOT / "results"
-TARGETS = (REPO_ROOT / "README.md", REPO_ROOT / "CHANGELOG.md")
+#: Only the README. A released CHANGELOG section is history: regenerating it would rewrite a
+#: past release's numbers with today's, so its block was frozen when the release was tagged.
+TARGETS = (REPO_ROOT / "README.md",)
 START = "<!-- results:start -->"
 END = "<!-- results:end -->"
 BLOCK = re.compile(re.escape(START) + r".*?" + re.escape(END), re.S)

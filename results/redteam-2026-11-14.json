@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T10:35:54.446598+00:00",
+  "generated_at": "2026-11-14T11:01:13.752260+00:00",
   "machine": {
     "platform": "macOS-26.6-arm64-arm-64bit",
     "machine": "arm64",
@@ -24,14 +24,14 @@
       "attacks": 67,
       "blocked": 67,
       "block_rate": 1.0,
-      "benign": 60,
-      "benign_allowed": 60,
+      "benign": 62,
+      "benign_allowed": 62,
       "false_positive_rate": 0.0,
       "errors": 0,
       "audit": {
         "gateways": 13,
         "chains_intact": 13,
-        "rows_verified": 242
+        "rows_verified": 246
       },
       "categories": [
         {
@@ -93,8 +93,8 @@
           "attacks": 0,
           "blocked": 0,
           "block_rate": 1.0,
-          "benign": 19,
-          "benign_allowed": 19,
+          "benign": 21,
+          "benign_allowed": 21,
           "errors": 0
         },
         {
@@ -199,7 +199,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0806
+          "duration_seconds": 0.0913
         },
         {
           "case_id": "ij-002-json-field-injection-blocked",
@@ -210,7 +210,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0174
+          "duration_seconds": 0.0266
         },
         {
           "case_id": "ei-003-non-english-injection-blocked",
@@ -221,7 +221,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0186
+          "duration_seconds": 0.0167
         },
         {
           "case_id": "ra-003-the-destructive-budget-is-separate",
@@ -233,7 +233,7 @@
             "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:budget)",
             "step 2 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0597
+          "duration_seconds": 0.0615
         },
         {
           "case_id": "ab-001-destructive-call-waits-for-a-human",
@@ -244,7 +244,7 @@
           "evidence": [
             "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 0.3325
+          "duration_seconds": 0.3336
         },
         {
           "case_id": "ab-002-note-delete-also-waits",
@@ -255,7 +255,7 @@
           "evidence": [
             "step 1 notes_db__delete_note -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 0.33
+          "duration_seconds": 0.3276
         },
         {
           "case_id": "ab-003-retrying-does-not-wear-down-the-control",
@@ -270,7 +270,7 @@
             "step 4 files__delete_file -> pending (WARDEN_PENDING:approval)",
             "step 5 files__delete_file -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 1.6095
+          "duration_seconds": 1.6262
         },
         {
           "case_id": "ab-004-changing-the-argument-does-not-inherit-an-approval",
@@ -282,7 +282,7 @@
             "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)",
             "step 2 files__delete_file -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 0.6866
+          "duration_seconds": 0.6739
         },
         {
           "case_id": "ab-005-a-write-does-not-need-approval",
@@ -294,7 +294,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 notes_db__create_note -> allowed"
           ],
-          "duration_seconds": 0.0367
+          "duration_seconds": 0.0271
         },
         {
           "case_id": "ab-006-reads-are-untouched-by-the-approval-stage",
@@ -306,7 +306,7 @@
             "step 1 notes_db__list_notes -> allowed",
             "step 2 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0219
+          "duration_seconds": 0.0188
         },
         {
           "case_id": "ra-001-burst-past-the-bucket-is-denied",
@@ -320,7 +320,7 @@
             "step 3 notes_db__list_notes -> allowed",
             "step 4 notes_db__list_notes -> denied (WARDEN_DENIED:rate_limit)"
           ],
-          "duration_seconds": 0.0289
+          "duration_seconds": 0.0275
         },
         {
           "case_id": "ra-002-a-refused-call-is-not-forwarded",
@@ -334,7 +334,7 @@
             "step 3 notes_db__list_notes -> allowed",
             "step 4 files__write_file -> denied (WARDEN_DENIED:rate_limit)"
           ],
-          "duration_seconds": 0.0238
+          "duration_seconds": 0.0222
         },
         {
           "case_id": "rs-002-oversized-arguments-are-denied",
@@ -345,7 +345,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:output_too_large)"
           ],
-          "duration_seconds": 0.0077
+          "duration_seconds": 0.007
         },
         {
           "case_id": "rs-001-oversized-result-is-denied-not-truncated",
@@ -356,7 +356,7 @@
           "evidence": [
             "step 1 evil__huge_output -> denied (WARDEN_DENIED:output_too_large)"
           ],
-          "duration_seconds": 0.0366
+          "duration_seconds": 0.0361
         },
         {
           "case_id": "rs-004-a-result-inside-the-limit-still-comes-through",
@@ -367,7 +367,7 @@
           "evidence": [
             "step 1 evil__huge_output -> allowed"
           ],
-          "duration_seconds": 0.045
+          "duration_seconds": 0.0431
         },
         {
           "case_id": "dlp-001-canary-in-an-argument-refused",
@@ -378,7 +378,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0151
+          "duration_seconds": 0.0139
         },
         {
           "case_id": "rp-003-trusted-servers-do-not-drift",
@@ -389,7 +389,7 @@
           "evidence": [
             "step 1 files__read_file -> upstream_error"
           ],
-          "duration_seconds": 30.2953
+          "duration_seconds": 30.192
         },
         {
           "case_id": "rp-001-definition-change-requarantines",
@@ -400,7 +400,7 @@
           "evidence": [
             "step 1 evil__fetch_quote -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.5645
+          "duration_seconds": 0.5697
         },
         {
           "case_id": "tp-001-poisoned-tool-quarantined",
@@ -411,7 +411,7 @@
           "evidence": [
             "step 1 evil__get_weather -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.0074
+          "duration_seconds": 0.007
         },
         {
           "case_id": "tp-002-poisoned-tool-hidden-from-listing",
@@ -422,7 +422,7 @@
           "evidence": [
             "redteam sees 10 tools"
           ],
-          "duration_seconds": 0.0045
+          "duration_seconds": 0.0044
         },
         {
           "case_id": "tp-003-shadow-read-file-quarantined",
@@ -433,7 +433,7 @@
           "evidence": [
             "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.0053
+          "duration_seconds": 0.0049
         },
         {
           "case_id": "tp-004-untrusted-server-tools-start-quarantined",
@@ -444,7 +444,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0048
         },
         {
           "case_id": "tp-005-slow-tool-quarantined-before-it-can-stall",
@@ -455,7 +455,7 @@
           "evidence": [
             "step 1 evil__slow_tool -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.0047
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "sh-001-shadow-tool-refused",
@@ -466,7 +466,7 @@
           "evidence": [
             "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.0049
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "sh-002-real-tool-still-works",
@@ -477,7 +477,7 @@
           "evidence": [
             "step 1 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0206
+          "duration_seconds": 0.0191
         },
         {
           "case_id": "sh-003-shadow-hidden-while-real-visible",
@@ -488,7 +488,7 @@
           "evidence": [
             "redteam sees 10 tools"
           ],
-          "duration_seconds": 0.004
+          "duration_seconds": 0.0038
         },
         {
           "case_id": "sh-004-approved-shadow-is-still-not-the-real-tool",
@@ -499,7 +499,7 @@
           "evidence": [
             "step 1 evil__read_file -> allowed"
           ],
-          "duration_seconds": 0.015
+          "duration_seconds": 0.0135
         },
         {
           "case_id": "sh-005-approved-shadow-cannot-name-a-sensitive-path",
@@ -510,7 +510,7 @@
           "evidence": [
             "step 1 evil__read_file -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0121
+          "duration_seconds": 0.0113
         },
         {
           "case_id": "rp-002-approved-tool-works-before-the-flip",
@@ -521,7 +521,7 @@
           "evidence": [
             "step 1 evil__fetch_quote -> allowed"
           ],
-          "duration_seconds": 0.0134
+          "duration_seconds": 0.0132
         },
         {
           "case_id": "ij-001-plain-injection-in-output-blocked",
@@ -532,7 +532,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.012
+          "duration_seconds": 0.0113
         },
         {
           "case_id": "ij-003-note-content-injection-is-wrapped-not-lost",
@@ -543,7 +543,7 @@
           "evidence": [
             "step 1 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0196
+          "duration_seconds": 0.0184
         },
         {
           "case_id": "ij-004-seeded-note-injection-via-search",
@@ -554,7 +554,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0212
+          "duration_seconds": 0.0199
         },
         {
           "case_id": "ij-005-benign-output-passes-untouched",
@@ -565,7 +565,7 @@
           "evidence": [
             "step 1 evil__get_weather -> allowed"
           ],
-          "duration_seconds": 0.0139
+          "duration_seconds": 0.0131
         },
         {
           "case_id": "ei-004-base64-in-a-written-note-is-not-a-false-positive",
@@ -576,7 +576,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0093
+          "duration_seconds": 0.0091
         },
         {
           "case_id": "dlp-002-ssh-private-key-refused",
@@ -587,7 +587,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0109
+          "duration_seconds": 0.0095
         },
         {
           "case_id": "dlp-003-aws-access-key-refused",
@@ -598,7 +598,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.01
+          "duration_seconds": 0.0095
         },
         {
           "case_id": "dlp-004-github-token-refused",
@@ -609,7 +609,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0102
+          "duration_seconds": 0.0094
         },
         {
           "case_id": "dlp-005-warden-api-key-refused",
@@ -620,7 +620,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0101
+          "duration_seconds": 0.0094
         },
         {
           "case_id": "dlp-006-database-url-with-password-refused",
@@ -631,7 +631,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0101
+          "duration_seconds": 0.0094
         },
         {
           "case_id": "dlp-007-secret-written-to-a-file-refused",
@@ -642,7 +642,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0055
+          "duration_seconds": 0.005
         },
         {
           "case_id": "dlp-008-ordinary-security-prose-is-not-a-leak",
@@ -653,7 +653,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0103
+          "duration_seconds": 0.009
         },
         {
           "case_id": "dlp-009-sql-mentioning-password-is-allowed",
@@ -664,7 +664,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0101
+          "duration_seconds": 0.0092
         },
         {
           "case_id": "pe-001-reader-cannot-delete-a-file",
@@ -675,7 +675,7 @@
           "evidence": [
             "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "pe-002-reader-cannot-delete-a-note",
@@ -686,7 +686,7 @@
           "evidence": [
             "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0047
+          "duration_seconds": 0.0045
         },
         {
           "case_id": "pe-003-reader-cannot-write",
@@ -697,7 +697,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "pe-004-explicit-deny-beats-absence-of-a-rule",
@@ -708,7 +708,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0049
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "pe-005-editor-cannot-reach-the-evil-server",
@@ -719,7 +719,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0051
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "pe-006-reader-cannot-reach-the-evil-server",
@@ -741,7 +741,7 @@
           "evidence": [
             "step 1 files__chmod -> denied (WARDEN_UNKNOWN_TOOL)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0044
         },
         {
           "case_id": "pe-008-unnamespaced-tool-name",
@@ -752,7 +752,7 @@
           "evidence": [
             "step 1 read_file -> denied (WARDEN_UNKNOWN_TOOL)"
           ],
-          "duration_seconds": 0.0046
+          "duration_seconds": 0.0044
         },
         {
           "case_id": "pe-009-reader-sees-only-read-tools",
@@ -763,7 +763,7 @@
           "evidence": [
             "reader sees 5 tools"
           ],
-          "duration_seconds": 0.0039
+          "duration_seconds": 0.0037
         },
         {
           "case_id": "pe-010-editor-gets-the-tools-its-role-grants",
@@ -774,7 +774,7 @@
           "evidence": [
             "editor sees 10 tools"
           ],
-          "duration_seconds": 0.0041
+          "duration_seconds": 0.0038
         },
         {
           "case_id": "pe-011-redteam-may-reach-what-it-is-granted",
@@ -785,7 +785,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0148
+          "duration_seconds": 0.0142
         },
         {
           "case_id": "cb-001-path-traversal-in-a-write",
@@ -796,7 +796,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0051
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "cb-002-path-traversal-in-a-read",
@@ -807,7 +807,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0047
+          "duration_seconds": 0.0045
         },
         {
           "case_id": "cb-003-traversal-disguised-by-a-subdirectory",
@@ -818,7 +818,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0045
+          "duration_seconds": 0.0044
         },
         {
           "case_id": "cb-004-absolute-path",
@@ -840,7 +840,7 @@
           "evidence": [
             "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0051
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "cb-006-percent-encoded-traversal",
@@ -851,7 +851,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0047
+          "duration_seconds": 0.0048
         },
         {
           "case_id": "cb-007-sql-write-through-the-gateway",
@@ -862,7 +862,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0101
+          "duration_seconds": 0.0091
         },
         {
           "case_id": "cb-008-sql-write-hidden-in-a-cte",
@@ -873,7 +873,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0075
+          "duration_seconds": 0.0073
         },
         {
           "case_id": "cb-009-two-sql-statements",
@@ -884,7 +884,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0081
+          "duration_seconds": 0.0072
         },
         {
           "case_id": "cb-010-sql-attach-another-database",
@@ -895,7 +895,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0074
+          "duration_seconds": 0.0068
         },
         {
           "case_id": "cb-011-oversized-sql-refused-by-the-constraint",
@@ -906,7 +906,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0052
+          "duration_seconds": 0.0048
         },
         {
           "case_id": "cb-012-oversized-note-title-refused",
@@ -917,7 +917,7 @@
           "evidence": [
             "step 1 notes_db__create_note -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0051
+          "duration_seconds": 0.0045
         },
         {
           "case_id": "cb-013-note-id-below-the-minimum",
@@ -928,7 +928,7 @@
           "evidence": [
             "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0048
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "cb-014-ordinary-relative-paths-still-work",
@@ -940,7 +940,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0147
+          "duration_seconds": 0.0137
         },
         {
           "case_id": "cb-015-a-normal-select-still-works",
@@ -951,7 +951,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0096
+          "duration_seconds": 0.0087
         },
         {
           "case_id": "cb-016-a-path-containing-dots-is-not-traversal",
@@ -962,7 +962,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0094
+          "duration_seconds": 0.0088
         },
         {
           "case_id": "cb-017-a-read-only-cte-is-allowed",
@@ -973,7 +973,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0099
+          "duration_seconds": 0.009
         },
         {
           "case_id": "af-001-expired",
@@ -984,7 +984,7 @@
           "evidence": [
             "credential 'expired' -> HTTP 401"
           ],
-          "duration_seconds": 0.0064
+          "duration_seconds": 0.0072
         },
         {
           "case_id": "af-002-not-yet-valid",
@@ -995,7 +995,7 @@
           "evidence": [
             "credential 'not_yet_valid' -> HTTP 401"
           ],
-          "duration_seconds": 0.0036
+          "duration_seconds": 0.0034
         },
         {
           "case_id": "af-003-wrong-audience",
@@ -1006,7 +1006,7 @@
           "evidence": [
             "credential 'wrong_audience' -> HTTP 401"
           ],
-          "duration_seconds": 0.0036
+          "duration_seconds": 0.0033
         },
         {
           "case_id": "af-004-wrong-issuer",
@@ -1017,7 +1017,7 @@
           "evidence": [
             "credential 'wrong_issuer' -> HTTP 401"
           ],
-          "duration_seconds": 0.0035
+          "duration_seconds": 0.0033
         },
         {
           "case_id": "af-005-signed-by-a-stranger",
@@ -1028,7 +1028,7 @@
           "evidence": [
             "credential 'signed_by_a_stranger' -> HTTP 401"
           ],
-          "duration_seconds": 0.0034
+          "duration_seconds": 0.0032
         },
         {
           "case_id": "af-006-unknown-kid",
@@ -1050,7 +1050,7 @@
           "evidence": [
             "credential 'alg_none' -> HTTP 401"
           ],
-          "duration_seconds": 0.0031
+          "duration_seconds": 0.003
         },
         {
           "case_id": "af-008-alg-confusion-hs256",
@@ -1061,7 +1061,7 @@
           "evidence": [
             "credential 'alg_confusion_hs256' -> HTTP 401"
           ],
-          "duration_seconds": 0.0046
+          "duration_seconds": 0.003
         },
         {
           "case_id": "af-009-unsigned-payload-swap",
@@ -1072,7 +1072,7 @@
           "evidence": [
             "credential 'unsigned_payload_swap' -> HTTP 401"
           ],
-          "duration_seconds": 0.0035
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "af-010-missing-claims",
@@ -1094,7 +1094,7 @@
           "evidence": [
             "credential 'invented_api_key' -> HTTP 401"
           ],
-          "duration_seconds": 0.0037
+          "duration_seconds": 0.0035
         },
         {
           "case_id": "af-012-truncated-api-key",
@@ -1105,7 +1105,7 @@
           "evidence": [
             "credential 'truncated_api_key' -> HTTP 401"
           ],
-          "duration_seconds": 0.0035
+          "duration_seconds": 0.0034
         },
         {
           "case_id": "af-013-not-a-credential",
@@ -1127,7 +1127,7 @@
           "evidence": [
             "credential 'empty' -> HTTP 401"
           ],
-          "duration_seconds": 0.003
+          "duration_seconds": 0.0029
         },
         {
           "case_id": "af-900-a-genuine-token-passes-authentication",
@@ -1138,7 +1138,7 @@
           "evidence": [
             "credential 'valid' -> HTTP 400"
           ],
-          "duration_seconds": 0.0037
+          "duration_seconds": 0.0034
         },
         {
           "case_id": "ra-004-normal-traffic-is-not-limited",
@@ -1158,7 +1158,7 @@
             "step 9 notes_db__get_note -> allowed",
             "step 10 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0579
+          "duration_seconds": 0.0528
         },
         {
           "case_id": "rs-003-a-slow-upstream-hits-the-timeout",
@@ -1169,7 +1169,7 @@
           "evidence": [
             "step 1 evil__slow_tool -> denied (WARDEN_UPSTREAM_TIMEOUT)"
           ],
-          "duration_seconds": 10.0205
+          "duration_seconds": 10.02
         },
         {
           "case_id": "rs-005-a-large-but-legal-file-write-works",
@@ -1180,7 +1180,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0311
+          "duration_seconds": 0.0298
         },
         {
           "case_id": "bn-list-notes-reader",
@@ -1191,7 +1191,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0176
+          "duration_seconds": 0.0158
         },
         {
           "case_id": "bn-get-note-reader",
@@ -1202,7 +1202,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0109
+          "duration_seconds": 0.011
         },
         {
           "case_id": "bn-search-notes-reader",
@@ -1213,7 +1213,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0111
+          "duration_seconds": 0.01
         },
         {
           "case_id": "bn-list-files-reader",
@@ -1224,7 +1224,7 @@
           "evidence": [
             "step 1 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0119
+          "duration_seconds": 0.0096
         },
         {
           "case_id": "bn-list-notes-editor",
@@ -1235,7 +1235,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0121
+          "duration_seconds": 0.0107
         },
         {
           "case_id": "bn-get-note-editor",
@@ -1246,7 +1246,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0104
+          "duration_seconds": 0.0091
         },
         {
           "case_id": "bn-search-notes-editor",
@@ -1257,7 +1257,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0096
+          "duration_seconds": 0.0087
         },
         {
           "case_id": "bn-list-files-editor",
@@ -1268,7 +1268,7 @@
           "evidence": [
             "step 1 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0093
+          "duration_seconds": 0.0089
         },
         {
           "case_id": "bn-list-notes-admin",
@@ -1279,7 +1279,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0105
+          "duration_seconds": 0.0099
         },
         {
           "case_id": "bn-get-note-admin",
@@ -1290,7 +1290,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.009
+          "duration_seconds": 0.0089
         },
         {
           "case_id": "bn-search-notes-admin",
@@ -1301,7 +1301,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0092
+          "duration_seconds": 0.0088
         },
         {
           "case_id": "bn-list-files-admin",
@@ -1312,7 +1312,7 @@
           "evidence": [
             "step 1 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0088
+          "duration_seconds": 0.0086
         },
         {
           "case_id": "bn-search-password",
@@ -1323,7 +1323,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0095
+          "duration_seconds": 0.0087
         },
         {
           "case_id": "bn-search-ignore",
@@ -1334,7 +1334,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0098
+          "duration_seconds": 0.0094
         },
         {
           "case_id": "bn-search-credentials",
@@ -1345,7 +1345,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0089
+          "duration_seconds": 0.0086
         },
         {
           "case_id": "bn-search-system",
@@ -1356,7 +1356,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.009
+          "duration_seconds": 0.0086
         },
         {
           "case_id": "bn-search-instructions",
@@ -1367,7 +1367,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0092
+          "duration_seconds": 0.0089
         },
         {
           "case_id": "bn-write-security-note",
@@ -1378,7 +1378,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0092
+          "duration_seconds": 0.0087
         },
         {
           "case_id": "bn-write-password-policy",
@@ -1389,7 +1389,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0088
+          "duration_seconds": 0.0087
         },
         {
           "case_id": "bn-write-incident-note",
@@ -1400,7 +1400,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0091
+          "duration_seconds": 0.0086
         },
         {
           "case_id": "bn-write-then-read",
@@ -1412,7 +1412,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0136
+          "duration_seconds": 0.0134
         },
         {
           "case_id": "bn-write-nested-then-list",
@@ -1424,7 +1424,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0135
+          "duration_seconds": 0.0133
         },
         {
           "case_id": "bn-create-then-search-note",
@@ -1436,7 +1436,7 @@
             "step 1 notes_db__create_note -> allowed",
             "step 2 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0143
+          "duration_seconds": 0.0144
         },
         {
           "case_id": "bn-create-note-with-long-body",
@@ -1447,7 +1447,7 @@
           "evidence": [
             "step 1 notes_db__create_note -> allowed"
           ],
-          "duration_seconds": 0.016
+          "duration_seconds": 0.0153
         },
         {
           "case_id": "bn-overwrite-a-file",
@@ -1459,7 +1459,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0133
+          "duration_seconds": 0.0131
         },
         {
           "case_id": "bn-sql-145489",
@@ -1470,7 +1470,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0098
+          "duration_seconds": 0.009
         },
         {
           "case_id": "bn-sql-130775",
@@ -1481,7 +1481,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0091
+          "duration_seconds": 0.0086
         },
         {
           "case_id": "bn-sql-225106",
@@ -1492,7 +1492,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0103
+          "duration_seconds": 0.0085
         },
         {
           "case_id": "bn-sql-961141",
@@ -1503,7 +1503,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0098
+          "duration_seconds": 0.0088
         },
         {
           "case_id": "bn-sql-27422",
@@ -1514,7 +1514,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0092
+          "duration_seconds": 0.0086
         },
         {
           "case_id": "bn-sql-624173",
@@ -1525,7 +1525,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0091
+          "duration_seconds": 0.0094
         },
         {
           "case_id": "bn-missing-file-is-an-upstream-error",
@@ -1536,7 +1536,7 @@
           "evidence": [
             "step 1 files__read_file -> upstream_error"
           ],
-          "duration_seconds": 0.0102
+          "duration_seconds": 0.0092
         },
         {
           "case_id": "bn-missing-note-is-an-upstream-error",
@@ -1547,7 +1547,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> upstream_error"
           ],
-          "duration_seconds": 0.0088
+          "duration_seconds": 0.0073
         },
         {
           "case_id": "bn-listing-a-file-as-a-directory",
@@ -1559,7 +1559,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__list_files -> upstream_error"
           ],
-          "duration_seconds": 0.0145
+          "duration_seconds": 0.0137
         },
         {
           "case_id": "bn-approved-evil-tool-works",
@@ -1570,7 +1570,7 @@
           "evidence": [
             "step 1 evil__get_weather -> allowed"
           ],
-          "duration_seconds": 0.0136
+          "duration_seconds": 0.013
         },
         {
           "case_id": "bn-approved-tool-visible-again",
@@ -1581,7 +1581,7 @@
           "evidence": [
             "redteam sees 14 tools"
           ],
-          "duration_seconds": 0.0088
+          "duration_seconds": 0.0082
         },
         {
           "case_id": "bn-admin-sees-both-real-servers",
@@ -1603,7 +1603,29 @@
           "evidence": [
             "reader sees 5 tools"
           ],
-          "duration_seconds": 0.0037
+          "duration_seconds": 0.0036
+        },
+        {
+          "case_id": "bn-list-files-without-a-path",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0086
+        },
+        {
+          "case_id": "bn-list-notes-without-a-limit",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.0204
         },
         {
           "case_id": "ei-002-zero-width-injection-blocked",
@@ -1614,7 +1636,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.016
+          "duration_seconds": 0.0168
         }
       ]
     },
@@ -1623,14 +1645,14 @@
       "attacks": 67,
       "blocked": 67,
       "block_rate": 1.0,
-      "benign": 60,
-      "benign_allowed": 59,
-      "false_positive_rate": 0.0167,
+      "benign": 62,
+      "benign_allowed": 61,
+      "false_positive_rate": 0.0161,
       "errors": 0,
       "audit": {
         "gateways": 13,
         "chains_intact": 13,
-        "rows_verified": 242
+        "rows_verified": 246
       },
       "categories": [
         {
@@ -1692,8 +1714,8 @@
           "attacks": 0,
           "blocked": 0,
           "block_rate": 1.0,
-          "benign": 19,
-          "benign_allowed": 19,
+          "benign": 21,
+          "benign_allowed": 21,
           "errors": 0
         },
         {
@@ -1809,7 +1831,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0734
+          "duration_seconds": 0.0686
         },
         {
           "case_id": "ij-002-json-field-injection-blocked",
@@ -1820,7 +1842,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0433
+          "duration_seconds": 0.0392
         },
         {
           "case_id": "ei-003-non-english-injection-blocked",
@@ -1831,7 +1853,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0506
+          "duration_seconds": 0.0413
         },
         {
           "case_id": "ra-003-the-destructive-budget-is-separate",
@@ -1843,7 +1865,7 @@
             "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:budget)",
             "step 2 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0676
+          "duration_seconds": 0.06
         },
         {
           "case_id": "ab-001-destructive-call-waits-for-a-human",
@@ -1854,7 +1876,7 @@
           "evidence": [
             "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 0.3633
+          "duration_seconds": 0.3598
         },
         {
           "case_id": "ab-002-note-delete-also-waits",
@@ -1865,7 +1887,7 @@
           "evidence": [
             "step 1 notes_db__delete_note -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 0.3307
+          "duration_seconds": 0.3285
         },
         {
           "case_id": "ab-003-retrying-does-not-wear-down-the-control",
@@ -1880,7 +1902,7 @@
             "step 4 files__delete_file -> pending (WARDEN_PENDING:approval)",
             "step 5 files__delete_file -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 1.6708
+          "duration_seconds": 1.656
         },
         {
           "case_id": "ab-004-changing-the-argument-does-not-inherit-an-approval",
@@ -1892,7 +1914,7 @@
             "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)",
             "step 2 files__delete_file -> pending (WARDEN_PENDING:approval)"
           ],
-          "duration_seconds": 0.7753
+          "duration_seconds": 0.7696
         },
         {
           "case_id": "ab-005-a-write-does-not-need-approval",
@@ -1904,7 +1926,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 notes_db__create_note -> allowed"
           ],
-          "duration_seconds": 0.1231
+          "duration_seconds": 0.1317
         },
         {
           "case_id": "ab-006-reads-are-untouched-by-the-approval-stage",
@@ -1916,7 +1938,7 @@
             "step 1 notes_db__list_notes -> allowed",
             "step 2 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.2208
+          "duration_seconds": 0.2044
         },
         {
           "case_id": "ra-001-burst-past-the-bucket-is-denied",
@@ -1930,7 +1952,7 @@
             "step 3 notes_db__list_notes -> allowed",
             "step 4 notes_db__list_notes -> denied (WARDEN_DENIED:rate_limit)"
           ],
-          "duration_seconds": 0.152
+          "duration_seconds": 0.1566
         },
         {
           "case_id": "ra-002-a-refused-call-is-not-forwarded",
@@ -1944,7 +1966,7 @@
             "step 3 notes_db__list_notes -> allowed",
             "step 4 files__write_file -> denied (WARDEN_DENIED:rate_limit)"
           ],
-          "duration_seconds": 0.1394
+          "duration_seconds": 0.1257
         },
         {
           "case_id": "rs-002-oversized-arguments-are-denied",
@@ -1955,7 +1977,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:output_too_large)"
           ],
-          "duration_seconds": 0.01
+          "duration_seconds": 0.0085
         },
         {
           "case_id": "rs-001-oversized-result-is-denied-not-truncated",
@@ -1966,7 +1988,7 @@
           "evidence": [
             "step 1 evil__huge_output -> denied (WARDEN_DENIED:output_too_large)"
           ],
-          "duration_seconds": 0.0398
+          "duration_seconds": 0.0421
         },
         {
           "case_id": "rs-004-a-result-inside-the-limit-still-comes-through",
@@ -1977,7 +1999,7 @@
           "evidence": [
             "step 1 evil__huge_output -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 1.0115
+          "duration_seconds": 0.8876
         },
         {
           "case_id": "dlp-001-canary-in-an-argument-refused",
@@ -1988,7 +2010,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0163
+          "duration_seconds": 0.0166
         },
         {
           "case_id": "rp-003-trusted-servers-do-not-drift",
@@ -1999,7 +2021,7 @@
           "evidence": [
             "step 1 files__read_file -> upstream_error"
           ],
-          "duration_seconds": 30.1272
+          "duration_seconds": 30.1524
         },
         {
           "case_id": "rp-001-definition-change-requarantines",
@@ -2010,7 +2032,7 @@
           "evidence": [
             "step 1 evil__fetch_quote -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.5491
+          "duration_seconds": 0.5582
         },
         {
           "case_id": "tp-001-poisoned-tool-quarantined",
@@ -2021,7 +2043,7 @@
           "evidence": [
             "step 1 evil__get_weather -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.01
+          "duration_seconds": 0.0092
         },
         {
           "case_id": "tp-002-poisoned-tool-hidden-from-listing",
@@ -2032,7 +2054,7 @@
           "evidence": [
             "redteam sees 10 tools"
           ],
-          "duration_seconds": 0.0058
+          "duration_seconds": 0.0052
         },
         {
           "case_id": "tp-003-shadow-read-file-quarantined",
@@ -2043,7 +2065,7 @@
           "evidence": [
             "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.0058
+          "duration_seconds": 0.0054
         },
         {
           "case_id": "tp-004-untrusted-server-tools-start-quarantined",
@@ -2054,7 +2076,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.006
+          "duration_seconds": 0.0054
         },
         {
           "case_id": "tp-005-slow-tool-quarantined-before-it-can-stall",
@@ -2065,7 +2087,7 @@
           "evidence": [
             "step 1 evil__slow_tool -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.0053
+          "duration_seconds": 0.005
         },
         {
           "case_id": "sh-001-shadow-tool-refused",
@@ -2076,7 +2098,7 @@
           "evidence": [
             "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0053
         },
         {
           "case_id": "sh-002-real-tool-still-works",
@@ -2087,7 +2109,7 @@
           "evidence": [
             "step 1 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0825
+          "duration_seconds": 0.0749
         },
         {
           "case_id": "sh-003-shadow-hidden-while-real-visible",
@@ -2098,7 +2120,7 @@
           "evidence": [
             "redteam sees 10 tools"
           ],
-          "duration_seconds": 0.0049
+          "duration_seconds": 0.0045
         },
         {
           "case_id": "sh-004-approved-shadow-is-still-not-the-real-tool",
@@ -2109,7 +2131,7 @@
           "evidence": [
             "step 1 evil__read_file -> allowed"
           ],
-          "duration_seconds": 0.039
+          "duration_seconds": 0.0388
         },
         {
           "case_id": "sh-005-approved-shadow-cannot-name-a-sensitive-path",
@@ -2120,7 +2142,7 @@
           "evidence": [
             "step 1 evil__read_file -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0353
+          "duration_seconds": 0.0334
         },
         {
           "case_id": "rp-002-approved-tool-works-before-the-flip",
@@ -2131,7 +2153,7 @@
           "evidence": [
             "step 1 evil__fetch_quote -> allowed"
           ],
-          "duration_seconds": 0.0457
+          "duration_seconds": 0.0343
         },
         {
           "case_id": "ij-001-plain-injection-in-output-blocked",
@@ -2142,7 +2164,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0352
+          "duration_seconds": 0.034
         },
         {
           "case_id": "ij-003-note-content-injection-is-wrapped-not-lost",
@@ -2153,7 +2175,7 @@
           "evidence": [
             "step 1 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0825
+          "duration_seconds": 0.0816
         },
         {
           "case_id": "ij-004-seeded-note-injection-via-search",
@@ -2164,7 +2186,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.1046
+          "duration_seconds": 0.1063
         },
         {
           "case_id": "ij-005-benign-output-passes-untouched",
@@ -2175,7 +2197,7 @@
           "evidence": [
             "step 1 evil__get_weather -> allowed"
           ],
-          "duration_seconds": 0.0434
+          "duration_seconds": 0.0341
         },
         {
           "case_id": "ei-004-base64-in-a-written-note-is-not-a-false-positive",
@@ -2186,7 +2208,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.031
+          "duration_seconds": 0.0293
         },
         {
           "case_id": "dlp-002-ssh-private-key-refused",
@@ -2197,7 +2219,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0107
+          "duration_seconds": 0.0108
         },
         {
           "case_id": "dlp-003-aws-access-key-refused",
@@ -2208,7 +2230,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0104
+          "duration_seconds": 0.0095
         },
         {
           "case_id": "dlp-004-github-token-refused",
@@ -2230,7 +2252,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0106
+          "duration_seconds": 0.0096
         },
         {
           "case_id": "dlp-006-database-url-with-password-refused",
@@ -2241,7 +2263,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0105
+          "duration_seconds": 0.0097
         },
         {
           "case_id": "dlp-007-secret-written-to-a-file-refused",
@@ -2252,7 +2274,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:dlp)"
           ],
-          "duration_seconds": 0.0056
+          "duration_seconds": 0.0053
         },
         {
           "case_id": "dlp-008-ordinary-security-prose-is-not-a-leak",
@@ -2263,7 +2285,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0297
+          "duration_seconds": 0.0294
         },
         {
           "case_id": "dlp-009-sql-mentioning-password-is-allowed",
@@ -2274,7 +2296,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0403
+          "duration_seconds": 0.0394
         },
         {
           "case_id": "pe-001-reader-cannot-delete-a-file",
@@ -2285,7 +2307,7 @@
           "evidence": [
             "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0058
+          "duration_seconds": 0.0053
         },
         {
           "case_id": "pe-002-reader-cannot-delete-a-note",
@@ -2296,7 +2318,7 @@
           "evidence": [
             "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0054
+          "duration_seconds": 0.005
         },
         {
           "case_id": "pe-003-reader-cannot-write",
@@ -2307,7 +2329,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0049
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "pe-004-explicit-deny-beats-absence-of-a-rule",
@@ -2318,7 +2340,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "pe-005-editor-cannot-reach-the-evil-server",
@@ -2329,7 +2351,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0048
         },
         {
           "case_id": "pe-006-reader-cannot-reach-the-evil-server",
@@ -2340,7 +2362,7 @@
           "evidence": [
             "step 1 evil__send_report -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0048
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "pe-007-unknown-tool-name",
@@ -2351,7 +2373,7 @@
           "evidence": [
             "step 1 files__chmod -> denied (WARDEN_UNKNOWN_TOOL)"
           ],
-          "duration_seconds": 0.0048
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "pe-008-unnamespaced-tool-name",
@@ -2362,7 +2384,7 @@
           "evidence": [
             "step 1 read_file -> denied (WARDEN_UNKNOWN_TOOL)"
           ],
-          "duration_seconds": 0.0053
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "pe-009-reader-sees-only-read-tools",
@@ -2373,7 +2395,7 @@
           "evidence": [
             "reader sees 5 tools"
           ],
-          "duration_seconds": 0.0041
+          "duration_seconds": 0.0038
         },
         {
           "case_id": "pe-010-editor-gets-the-tools-its-role-grants",
@@ -2384,7 +2406,7 @@
           "evidence": [
             "editor sees 10 tools"
           ],
-          "duration_seconds": 0.0041
+          "duration_seconds": 0.0039
         },
         {
           "case_id": "pe-011-redteam-may-reach-what-it-is-granted",
@@ -2395,7 +2417,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.0979
+          "duration_seconds": 0.0905
         },
         {
           "case_id": "cb-001-path-traversal-in-a-write",
@@ -2406,7 +2428,7 @@
           "evidence": [
             "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0062
+          "duration_seconds": 0.0055
         },
         {
           "case_id": "cb-002-path-traversal-in-a-read",
@@ -2417,7 +2439,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0054
+          "duration_seconds": 0.0049
         },
         {
           "case_id": "cb-003-traversal-disguised-by-a-subdirectory",
@@ -2428,7 +2450,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0049
         },
         {
           "case_id": "cb-004-absolute-path",
@@ -2439,7 +2461,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0047
         },
         {
           "case_id": "cb-005-traversal-in-a-delete",
@@ -2450,7 +2472,7 @@
           "evidence": [
             "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0052
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "cb-006-percent-encoded-traversal",
@@ -2461,7 +2483,7 @@
           "evidence": [
             "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0046
         },
         {
           "case_id": "cb-007-sql-write-through-the-gateway",
@@ -2472,7 +2494,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0333
+          "duration_seconds": 0.0304
         },
         {
           "case_id": "cb-008-sql-write-hidden-in-a-cte",
@@ -2483,7 +2505,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0273
+          "duration_seconds": 0.0259
         },
         {
           "case_id": "cb-009-two-sql-statements",
@@ -2494,7 +2516,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0274
+          "duration_seconds": 0.0241
         },
         {
           "case_id": "cb-010-sql-attach-another-database",
@@ -2505,7 +2527,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> upstream_error"
           ],
-          "duration_seconds": 0.0273
+          "duration_seconds": 0.0243
         },
         {
           "case_id": "cb-011-oversized-sql-refused-by-the-constraint",
@@ -2516,7 +2538,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0057
+          "duration_seconds": 0.0052
         },
         {
           "case_id": "cb-012-oversized-note-title-refused",
@@ -2527,7 +2549,7 @@
           "evidence": [
             "step 1 notes_db__create_note -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.0053
+          "duration_seconds": 0.0049
         },
         {
           "case_id": "cb-013-note-id-below-the-minimum",
@@ -2538,7 +2560,7 @@
           "evidence": [
             "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
           ],
-          "duration_seconds": 0.005
+          "duration_seconds": 0.0048
         },
         {
           "case_id": "cb-014-ordinary-relative-paths-still-work",
@@ -2550,7 +2572,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0694
+          "duration_seconds": 0.0637
         },
         {
           "case_id": "cb-015-a-normal-select-still-works",
@@ -2561,7 +2583,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0385
+          "duration_seconds": 0.0367
         },
         {
           "case_id": "cb-016-a-path-containing-dots-is-not-traversal",
@@ -2572,7 +2594,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0329
+          "duration_seconds": 0.03
         },
         {
           "case_id": "cb-017-a-read-only-cte-is-allowed",
@@ -2583,7 +2605,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0353
+          "duration_seconds": 0.0335
         },
         {
           "case_id": "af-001-expired",
@@ -2605,7 +2627,7 @@
           "evidence": [
             "credential 'not_yet_valid' -> HTTP 401"
           ],
-          "duration_seconds": 0.0034
+          "duration_seconds": 0.0035
         },
         {
           "case_id": "af-003-wrong-audience",
@@ -2616,7 +2638,7 @@
           "evidence": [
             "credential 'wrong_audience' -> HTTP 401"
           ],
-          "duration_seconds": 0.0036
+          "duration_seconds": 0.0034
         },
         {
           "case_id": "af-004-wrong-issuer",
@@ -2627,7 +2649,7 @@
           "evidence": [
             "credential 'wrong_issuer' -> HTTP 401"
           ],
-          "duration_seconds": 0.0036
+          "duration_seconds": 0.0035
         },
         {
           "case_id": "af-005-signed-by-a-stranger",
@@ -2638,7 +2660,7 @@
           "evidence": [
             "credential 'signed_by_a_stranger' -> HTTP 401"
           ],
-          "duration_seconds": 0.0036
+          "duration_seconds": 0.0034
         },
         {
           "case_id": "af-006-unknown-kid",
@@ -2649,7 +2671,7 @@
           "evidence": [
             "credential 'unknown_kid' -> HTTP 401"
           ],
-          "duration_seconds": 0.0034
+          "duration_seconds": 0.0033
         },
         {
           "case_id": "af-007-alg-none",
@@ -2660,7 +2682,7 @@
           "evidence": [
             "credential 'alg_none' -> HTTP 401"
           ],
-          "duration_seconds": 0.0032
+          "duration_seconds": 0.0031
         },
         {
           "case_id": "af-008-alg-confusion-hs256",
@@ -2693,7 +2715,7 @@
           "evidence": [
             "credential 'missing_claims' -> HTTP 401"
           ],
-          "duration_seconds": 0.0035
+          "duration_seconds": 0.0034
         },
         {
           "case_id": "af-011-invented-api-key",
@@ -2715,7 +2737,7 @@
           "evidence": [
             "credential 'truncated_api_key' -> HTTP 401"
           ],
-          "duration_seconds": 0.0036
+          "duration_seconds": 0.0035
         },
         {
           "case_id": "af-013-not-a-credential",
@@ -2737,7 +2759,7 @@
           "evidence": [
             "credential 'empty' -> HTTP 401"
           ],
-          "duration_seconds": 0.003
+          "duration_seconds": 0.0029
         },
         {
           "case_id": "af-900-a-genuine-token-passes-authentication",
@@ -2748,7 +2770,7 @@
           "evidence": [
             "credential 'valid' -> HTTP 400"
           ],
-          "duration_seconds": 0.004
+          "duration_seconds": 0.0036
         },
         {
           "case_id": "ra-004-normal-traffic-is-not-limited",
@@ -2768,7 +2790,7 @@
             "step 9 notes_db__get_note -> allowed",
             "step 10 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.403
+          "duration_seconds": 0.3633
         },
         {
           "case_id": "rs-003-a-slow-upstream-hits-the-timeout",
@@ -2779,7 +2801,7 @@
           "evidence": [
             "step 1 evil__slow_tool -> denied (WARDEN_UPSTREAM_TIMEOUT)"
           ],
-          "duration_seconds": 10.0221
+          "duration_seconds": 10.0204
         },
         {
           "case_id": "rs-005-a-large-but-legal-file-write-works",
@@ -2790,7 +2812,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.1084
+          "duration_seconds": 0.1066
         },
         {
           "case_id": "bn-list-notes-reader",
@@ -2801,7 +2823,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.2744
+          "duration_seconds": 0.2552
         },
         {
           "case_id": "bn-get-note-reader",
@@ -2812,7 +2834,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0464
+          "duration_seconds": 0.0423
         },
         {
           "case_id": "bn-search-notes-reader",
@@ -2823,7 +2845,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0497
+          "duration_seconds": 0.0446
         },
         {
           "case_id": "bn-list-files-reader",
@@ -2834,7 +2856,7 @@
           "evidence": [
             "step 1 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0474
+          "duration_seconds": 0.0407
         },
         {
           "case_id": "bn-list-notes-editor",
@@ -2845,7 +2867,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.2503
+          "duration_seconds": 0.2106
         },
         {
           "case_id": "bn-get-note-editor",
@@ -2856,7 +2878,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0579
+          "duration_seconds": 0.0407
         },
         {
           "case_id": "bn-search-notes-editor",
@@ -2867,7 +2889,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.053
+          "duration_seconds": 0.0427
         },
         {
           "case_id": "bn-list-files-editor",
@@ -2878,7 +2900,7 @@
           "evidence": [
             "step 1 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0425
+          "duration_seconds": 0.0357
         },
         {
           "case_id": "bn-list-notes-admin",
@@ -2889,7 +2911,7 @@
           "evidence": [
             "step 1 notes_db__list_notes -> allowed"
           ],
-          "duration_seconds": 0.2398
+          "duration_seconds": 0.21
         },
         {
           "case_id": "bn-get-note-admin",
@@ -2900,7 +2922,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> allowed"
           ],
-          "duration_seconds": 0.0448
+          "duration_seconds": 0.0396
         },
         {
           "case_id": "bn-search-notes-admin",
@@ -2911,7 +2933,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0477
+          "duration_seconds": 0.0426
         },
         {
           "case_id": "bn-list-files-admin",
@@ -2922,7 +2944,7 @@
           "evidence": [
             "step 1 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0409
+          "duration_seconds": 0.0353
         },
         {
           "case_id": "bn-search-password",
@@ -2933,7 +2955,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.057
+          "duration_seconds": 0.0473
         },
         {
           "case_id": "bn-search-ignore",
@@ -2944,7 +2966,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.1007
+          "duration_seconds": 0.0905
         },
         {
           "case_id": "bn-search-credentials",
@@ -2955,7 +2977,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0489
+          "duration_seconds": 0.0451
         },
         {
           "case_id": "bn-search-system",
@@ -2966,7 +2988,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0507
+          "duration_seconds": 0.0473
         },
         {
           "case_id": "bn-search-instructions",
@@ -2977,7 +2999,7 @@
           "evidence": [
             "step 1 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.0527
+          "duration_seconds": 0.0492
         },
         {
           "case_id": "bn-write-security-note",
@@ -2988,7 +3010,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0349
+          "duration_seconds": 0.0326
         },
         {
           "case_id": "bn-write-password-policy",
@@ -2999,7 +3021,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0333
+          "duration_seconds": 0.0314
         },
         {
           "case_id": "bn-write-incident-note",
@@ -3010,7 +3032,7 @@
           "evidence": [
             "step 1 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0343
+          "duration_seconds": 0.0315
         },
         {
           "case_id": "bn-write-then-read",
@@ -3022,7 +3044,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__read_file -> allowed"
           ],
-          "duration_seconds": 0.0642
+          "duration_seconds": 0.0595
         },
         {
           "case_id": "bn-write-nested-then-list",
@@ -3034,7 +3056,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__list_files -> allowed"
           ],
-          "duration_seconds": 0.0772
+          "duration_seconds": 0.0697
         },
         {
           "case_id": "bn-create-then-search-note",
@@ -3046,7 +3068,7 @@
             "step 1 notes_db__create_note -> allowed",
             "step 2 notes_db__search_notes -> allowed"
           ],
-          "duration_seconds": 0.087
+          "duration_seconds": 0.0804
         },
         {
           "case_id": "bn-create-note-with-long-body",
@@ -3057,7 +3079,7 @@
           "evidence": [
             "step 1 notes_db__create_note -> allowed"
           ],
-          "duration_seconds": 0.773
+          "duration_seconds": 0.7089
         },
         {
           "case_id": "bn-overwrite-a-file",
@@ -3069,7 +3091,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__write_file -> allowed"
           ],
-          "duration_seconds": 0.0678
+          "duration_seconds": 0.0573
         },
         {
           "case_id": "bn-sql-145489",
@@ -3080,7 +3102,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0699
+          "duration_seconds": 0.0638
         },
         {
           "case_id": "bn-sql-130775",
@@ -3091,7 +3113,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.041
+          "duration_seconds": 0.0379
         },
         {
           "case_id": "bn-sql-225106",
@@ -3102,7 +3124,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0386
+          "duration_seconds": 0.0383
         },
         {
           "case_id": "bn-sql-961141",
@@ -3113,7 +3135,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.1507
+          "duration_seconds": 0.1391
         },
         {
           "case_id": "bn-sql-27422",
@@ -3124,7 +3146,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0447
+          "duration_seconds": 0.0387
         },
         {
           "case_id": "bn-sql-624173",
@@ -3135,7 +3157,7 @@
           "evidence": [
             "step 1 notes_db__run_sql -> allowed"
           ],
-          "duration_seconds": 0.0746
+          "duration_seconds": 0.0753
         },
         {
           "case_id": "bn-missing-file-is-an-upstream-error",
@@ -3146,7 +3168,7 @@
           "evidence": [
             "step 1 files__read_file -> upstream_error"
           ],
-          "duration_seconds": 0.0417
+          "duration_seconds": 0.0413
         },
         {
           "case_id": "bn-missing-note-is-an-upstream-error",
@@ -3157,7 +3179,7 @@
           "evidence": [
             "step 1 notes_db__get_note -> upstream_error"
           ],
-          "duration_seconds": 0.0337
+          "duration_seconds": 0.0333
         },
         {
           "case_id": "bn-listing-a-file-as-a-directory",
@@ -3169,7 +3191,7 @@
             "step 1 files__write_file -> allowed",
             "step 2 files__list_files -> upstream_error"
           ],
-          "duration_seconds": 0.0625
+          "duration_seconds": 0.0584
         },
         {
           "case_id": "bn-approved-evil-tool-works",
@@ -3180,7 +3202,7 @@
           "evidence": [
             "step 1 evil__get_weather -> allowed"
           ],
-          "duration_seconds": 0.0487
+          "duration_seconds": 0.0358
         },
         {
           "case_id": "bn-approved-tool-visible-again",
@@ -3191,7 +3213,7 @@
           "evidence": [
             "redteam sees 14 tools"
           ],
-          "duration_seconds": 0.0095
+          "duration_seconds": 0.0097
         },
         {
           "case_id": "bn-admin-sees-both-real-servers",
@@ -3213,7 +3235,29 @@
           "evidence": [
             "reader sees 5 tools"
           ],
-          "duration_seconds": 0.0046
+          "duration_seconds": 0.0042
+        },
+        {
+          "case_id": "bn-list-files-without-a-path",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.037
+        },
+        {
+          "case_id": "bn-list-notes-without-a-limit",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 1.1351
         },
         {
           "case_id": "ei-002-zero-width-injection-blocked",
@@ -3224,7 +3268,7 @@
           "evidence": [
             "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
           ],
-          "duration_seconds": 0.0393
+          "duration_seconds": 0.0343
         }
       ]
     }

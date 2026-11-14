@@ -466,3 +466,24 @@ cases:
     - files__delete_file
   attack: false
   category: benign_workflow
+- id: bn-list-files-without-a-path
+  role: editor
+  description: >-
+    Listing the sandbox the way the tool's schema allows, with `path` omitted. The schema
+    defaults it to ".", which the gateway fills from the pinned definition before policy runs.
+    Missing from the suite until the soak test found this call refused.
+  steps:
+  - tool: files__list_files
+    args: {}
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-list-notes-without-a-limit
+  role: reader
+  description: Listing notes with `limit` left to its schema default of 20.
+  steps:
+  - tool: notes_db__list_notes
+    args: {}
+    expect: allowed
+  attack: false
+  category: benign_workflow

@@ -7,6 +7,7 @@ half-finished.
 
 - `make lint` clean: ruff check, ruff format --check, mypy --strict on `src/warden` and `servers`.
 - `make test`: 1323 passed, unit + integration, against real Postgres and Redis.
+  After the post-release defaults fix: 1352 passed.
 - `make test-all`: every layer; the five `e2e` tests skip because Ollama is not installed here.
 - `make cov`: 94.27% on `src/warden` against an 85% gate.
 - `make security`: bandit clean (two justified `nosec`), pip-audit clean.
@@ -27,12 +28,12 @@ half-finished.
 
 ## Known gaps worth fixing next
 
-Full list in `docs/threat-model.md#known-gaps`. The two most actionable:
+Full list in `docs/threat-model.md#known-gaps`. The most actionable: **the gateway advertises
+itself as an OAuth authorization server it is not.** Either delegate to a real one or stop
+naming it in the RFC 9728 metadata.
 
-1. **A constraint on an absent optional argument denies** (`files__list_files {}`). Fill the
-   default from the pinned schema, check it, forward exactly what was checked.
-2. **The gateway advertises itself as an OAuth authorization server it is not.** Either delegate
-   to a real one or stop naming it in the RFC 9728 metadata.
+The absent-argument false positive found by the soak test is fixed since v0.1.0 (see
+`CHANGELOG.md`, Unreleased).
 
 ## Backing services on this machine
 

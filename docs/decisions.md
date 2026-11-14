@@ -774,3 +774,44 @@ over the second half only, where a leak would keep growing once warm-up is over.
 figure was added to the script and recomputed from the stored per-window samples with
 `python -m bench.soak --rerender`; nothing was re-measured or edited by hand. Thirty minutes
 cannot rule out a leak slower than the window can see, and the report does not claim to.
+
+## After v0.1.0 - filling omitted arguments from the pinned schema
+
+The soak test's false positive, fixed. `files__list_files {}` was refused: the tool declares
+`path` optional with default `"."`, the policy constrains `path`, and a constraint on an absent
+argument fails closed.
+
+**Why not "absent means allowed".** That is the obvious one-line fix and the wrong one. It would
+let the upstream's own default run without the operator's constraint ever seeing it - and the
+upstream chooses that default. An upstream declaring `path` defaulting to `/etc` would turn
+"the caller left it out" into a way round `starts_with: "."`.
+
+**What was done instead.** A `defaults` stage between `definitions` and `policy` fills each
+omitted top-level argument with the schema's declared default. Policy then checks that value,
+DLP scans it, the audit row records it (with `scan_flags.defaults_filled` naming what was
+added), and the upstream receives it explicitly rather than being left to substitute its own.
+The checked value and the executed value are the same value. A test stands up an upstream whose
+default violates the constraint and asserts the call is refused and never forwarded; another
+asserts that when the default is allowed, the upstream receives exactly the filled value.
+
+**Where the default is read from.** The registry's definition, which equals the pinned one:
+the stage runs after `DefinitionIntegrity`, and on a listing change pins are reconciled before
+the registry is replaced, so a definition that changed - including only a default, which changes
+its hash - is quarantined before it can be read.
+
+**Two limits, both to avoid creating new false positives.** `null` defaults are not filled:
+Pydantic emits `"default": null` for every optional parameter, and an explicit `null` would make
+an `optional: true` constraint, which tolerates absence, see a wrong-typed value and deny. And
+only top-level arguments are filled, because constraints only name top-level arguments.
+
+**Effect on the shipped servers**, checked before writing the stage: exactly two non-null
+defaults exist - `list_notes.limit = 20` (unconstrained) and `list_files.path = "."` (passes
+`starts_with: "."`) - so no call that was allowed becomes denied.
+
+**Why the suite missed it.** Every benign `list_files` case passed `path: "."`. Two benign cases
+that omit an optional argument were added. A one-minute soak with the mix restored to `{}`
+went from 120 refusals of that call to 120 allowed.
+
+**Release bookkeeping.** v0.1.0 was already tagged, so this is listed under Unreleased in the
+CHANGELOG, and the v0.1.0 section's results block is frozen at the figures it was released
+with; `make readme-results` now regenerates only the README.

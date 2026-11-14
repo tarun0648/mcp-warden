@@ -42,7 +42,7 @@ client --POST /mcp--> request id -> body/batch limits -> auth middleware
                                                              |
                                                       RequestContext
                                                              |
-   authenticate -> resolve -> definition integrity -> policy -> rate limit + budget
+   authenticate -> resolve -> definition integrity -> schema defaults -> policy -> rate limit + budget
       -> argument DLP -> approval -> FORWARD (timeout) -> output scan
                                                              |
                                             finish hooks (audit log, metrics, traces)
@@ -54,7 +54,9 @@ Stages added per phase: `resolve` and `forward` in Phase 3; `authenticate` in 4;
 `ratelimit` in 6; the audit finish hook and write-ahead in 7; `definitions`, `dlp` and
 `output_scan` in 8; `approval` in 9. Phase 13 added the HTTP-edge limits in front of the
 transport; they are middleware rather than stages because they must run before the body is
-parsed, and a stage only ever sees a parsed request.
+parsed, and a stage only ever sees a parsed request. After v0.1.0, `defaults` joined between `definitions` and
+`policy`: it fills omitted arguments from the pinned schema so the constraints check what will
+be forwarded (`src/warden/policy/defaults.py`).
 
 Two properties hold at every phase:
 

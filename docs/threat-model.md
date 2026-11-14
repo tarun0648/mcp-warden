@@ -98,6 +98,10 @@ E = elevation of privilege.
 | E | An unknown tool or unknown role slips through | unknown tool is destructive; unknown role grants nothing | `tests/unit/test_policy_engine.py::test_an_unknown_tool_is_treated_as_destructive`, `tests/unit/test_policy_engine.py::test_unknown_roles_never_grant_the_destructive_tool` |
 | E | Path traversal through an allowed tool (`../`, percent-encoding) | `starts_with` compares normalised whole segments | `tests/integration/test_gateway_policy.py::test_an_argument_constraint_blocks_traversal_at_the_gateway`, `tests/unit/test_policy_engine.py::test_no_path_an_editor_can_write_ever_escapes_the_root` |
 | E | A glob in one server's rule matches another server's tools | glob never crosses the `__` separator | `tests/unit/test_policy_engine.py::test_a_pattern_that_does_not_name_a_server_is_rejected` |
+| E | An omitted argument lets the upstream's own default run unchecked | the pinned schema's default is filled *before* policy and forwarded as checked | `tests/integration/test_gateway_defaults.py::test_what_the_upstream_receives_is_what_the_gateway_checked`, `tests/unit/test_policy_defaults.py::test_the_stage_sits_between_integrity_and_policy` |
+| E | An upstream declares a default that violates the operator's constraint | the filled value is checked like a caller's; refused, never forwarded | `tests/integration/test_gateway_defaults.py::test_a_default_that_breaks_a_constraint_is_refused_and_never_forwarded` |
+| T | A rug pull changes only a default | the definition hash covers the schema, so the tool is quarantined first | `tests/unit/test_policy_defaults.py::test_changing_only_a_default_changes_the_pin` |
+| D | A schema-conforming call that omits an optional argument is refused | defaults filled, so the constraint sees a value | `tests/integration/test_gateway_defaults.py::test_list_files_without_a_path_is_allowed` |
 | T | A broken policy reload leaves the gateway open | the old policy stays in force | `tests/integration/test_gateway_policy.py::test_a_broken_reload_is_rejected_and_the_old_policy_still_enforces` |
 | I | `tools/list` reveals tools the caller cannot use | listing is filtered by the same policy | `tests/integration/test_gateway_policy.py::test_each_role_sees_a_different_tool_list` |
 
@@ -238,13 +242,6 @@ Stated rather than implied. Each is a real limit of v0.1.0, not a hypothetical.
   gateway, as the same user, with the gateway's filesystem view. The gateway constrains what
   the *model* can ask it to do; it does not sandbox what the upstream process itself does. An
   untrusted upstream belongs behind Streamable HTTP in its own container.
-- **A constraint on an absent optional argument denies.** `files__list_files` declares `path`
-  optional with a default of `"."`, but the policy constrains `path`, and an absent constrained
-  argument fails closed. A schema-conforming `list_files {}` is therefore refused - a false
-  positive found by the soak test, not by the red-team suite, whose benign cases all pass a
-  path. The fix is for the gateway to fill the default from the *pinned* definition and
-  forward exactly what it checked; it changes request-path semantics and is left for after
-  v0.1.0.
 - **The hash chain detects partial tampering, not a wholesale rebuild.** Truncating the tail
   also leaves a consistent chain. `warden audit verify` prints the head hash so it can be
   pinned outside the gateway; doing that pinning is not implemented.

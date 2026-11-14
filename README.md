@@ -53,8 +53,10 @@ together with the rule that decided it and a request id you can look up in the a
 - **Authentication** - API keys (stored as hashes) and ES256 JWTs with rotation, revocation and
   a published JWKS. The caller's credential is never forwarded to an upstream.
 - **Deny-by-default policy** - per-role allow/deny rules on namespaced tools, with argument
-  constraints (normalised path prefixes, lengths, ranges, regexes, enumerations). `tools/list`
-  only shows what you may call. Hot reload that keeps the old policy if the new one is broken.
+  constraints (normalised path prefixes, lengths, ranges, regexes, enumerations). An omitted
+  argument is filled from the pinned schema's default and checked like any other, so what is
+  checked is what is forwarded. `tools/list` only shows what you may call. Hot reload that keeps
+  the old policy if the new one is broken.
 - **Tool-definition integrity** - every definition is hashed and pinned. A poisoned description
   or a later change (a *rug pull*) quarantines the tool; untrusted servers start fully
   quarantined until an admin approves.
@@ -128,24 +130,24 @@ typed by hand, and a test fails if it goes stale.
 
 | Configuration | Attacks blocked | Attack categories | Benign allowed | False positives |
 | --- | --- | --- | --- | --- |
-| rules only | 67/67 (100.0%) | 12 | 60/60 | 0.0% |
-| rules + classifier | 67/67 (100.0%) | 12 | 59/60 | 1.7% |
+| rules only | 67/67 (100.0%) | 12 | 62/62 | 0.0% |
+| rules + classifier | 67/67 (100.0%) | 12 | 61/62 | 1.6% |
 
 **Latency added by the gateway** - [`results/bench-2026-11-14.md`](results/bench-2026-11-14.md) - 1000 calls of `notes_db__get_note` per measurement on Apple M4
 
-Direct to the upstream, one call at a time: p50 0.91 ms. Added on top of that:
+Direct to the upstream, one call at a time: p50 0.93 ms. Added on top of that:
 
 | Configuration | Concurrency | p50 added (ms) | p95 added (ms) | p99 added (ms) |
 | --- | --- | --- | --- | --- |
-| auth+policy | 1 | 2.28 | 2.52 | 2.89 |
-| auth+policy | 10 | 18.77 | 20.35 | 67.66 |
-| auth+policy | 50 | 100.24 | 106.10 | 136.54 |
-| full (rules) | 1 | 3.83 | 4.66 | 6.26 |
-| full (rules) | 10 | 33.27 | 39.29 | 84.72 |
-| full (rules) | 50 | 170.79 | 182.30 | 203.85 |
-| full (classifier) | 1 | 38.85 | 39.60 | 39.89 |
-| full (classifier) | 10 | 361.15 | 402.83 | 481.45 |
-| full (classifier) | 50 | 2018.07 | 2036.41 | 2130.16 |
+| auth+policy | 1 | 2.11 | 2.15 | 2.26 |
+| auth+policy | 10 | 17.50 | 20.38 | 62.82 |
+| auth+policy | 50 | 96.64 | 138.38 | 201.74 |
+| full (rules) | 1 | 3.53 | 3.65 | 4.11 |
+| full (rules) | 10 | 31.56 | 36.25 | 78.98 |
+| full (rules) | 50 | 163.75 | 216.58 | 228.49 |
+| full (classifier) | 1 | 34.36 | 34.89 | 35.77 |
+| full (classifier) | 10 | 334.24 | 439.46 | 533.45 |
+| full (classifier) | 50 | 2052.81 | 2201.49 | 2238.32 |
 
 **Soak** - [`results/soak-2026-11-14.md`](results/soak-2026-11-14.md) - 30 min at 20 calls/s
 
@@ -206,13 +208,9 @@ The ones that matter most:
 - **Single node.** Approval sessions are in memory.
 - **Stdio upstreams run as the gateway's user.** Put an untrusted server behind HTTP in its own
   container.
-- **A constraint on an absent optional argument denies**, so `files__list_files {}` is refused
-  even though the tool defaults `path` to `"."`.
 
 ## Roadmap
 
-- Fill a constrained argument's default from the pinned schema, and forward exactly what was
-  checked.
 - Delegate token issuance to an external OAuth 2.1 server; drop the development issuer.
 - Pin the audit head hash somewhere the gateway cannot write.
 - Shared approval sessions for more than one gateway node.
