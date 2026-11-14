@@ -40,7 +40,9 @@ INVISIBLE_RANGES: Final[tuple[tuple[int, int], ...]] = (
     (0xE0000, 0xE007F),  # tag characters: a whole hidden alphabet
 )
 
-BIDI_CONTROLS: Final[frozenset[str]] = frozenset("‪‫‬‭‮⁦⁧⁨⁩")
+BIDI_CONTROLS: Final[frozenset[str]] = frozenset(
+    "\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
 
 
 def _is_invisible(char: str) -> bool:
@@ -68,7 +70,7 @@ def find_invisible_characters(text: str, where: str = "") -> list[Finding]:
 
 
 def strip_invisible(text: str) -> str:
-    """The text as a human sees it, for rules that should not be fooled by `i​gnore`."""
+    """The text as a human sees it, for rules that should not be fooled by `i\u200bgnore`."""
     return "".join(char for char in text if not _is_invisible(char))
 
 

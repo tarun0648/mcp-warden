@@ -11,14 +11,14 @@
   </form>
 </div>
 
-<h2 style="font-size:1rem">Waiting</h2>
+<h2>Waiting</h2>
 {# Polled rather than pushed: a page that silently stops updating is worse than one that
    refetches a small fragment every two seconds. #}
 <div id="queue" hx-get="/approvals/queue" hx-trigger="every 2s" hx-swap="innerHTML">
   {% include "_queue.html" %}
 </div>
 
-<h2 style="font-size:1rem">Recently decided</h2>
+<h2>Recently decided</h2>
 {% if not recent %}
   <p class="empty">Nothing decided yet.</p>
 {% else %}

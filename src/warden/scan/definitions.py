@@ -142,7 +142,8 @@ class DefinitionScanner:
         )
 
     async def _classify(self, tool: Tool) -> ClassifierResult:
-        assert self._classifier is not None
+        if self._classifier is None:
+            raise RuntimeError("classifier requested but none is configured")
         joined = "\n".join(text for _where, text in definition_texts(tool) if text)
         return await self._classifier.classify(joined)
 

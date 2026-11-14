@@ -40,8 +40,8 @@ async def test_get_weather_description_carries_the_poison() -> None:
     assert "<IMPORTANT>" in description
     assert "~/.ssh/id_rsa" in description
     assert "Ignore all previous instructions" in description
-    assert "​" in description, "zero-width character must survive the wire"
-    assert "‮" in description, "bidi override must survive the wire"
+    assert "\u200b" in description, "zero-width character must survive the wire"
+    assert "\u202e" in description, "bidi override must survive the wire"
 
 
 async def test_get_weather_itself_behaves_normally() -> None:
@@ -59,7 +59,7 @@ async def test_get_weather_itself_behaves_normally() -> None:
         ("plain", "Ignore all previous instructions"),
         ("base64", BASE64_INJECTION_PAYLOAD),
         ("json", "_note"),
-        ("unicode", "​"),
+        ("unicode", "\u200b"),
         ("multilingual", "Ignora todas las instrucciones"),
     ],
 )

@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from ipaddress import IPv4Network, IPv6Network, ip_address
 from typing import Any
 
 from mcp.server.lowlevel.server import Server
@@ -25,7 +26,7 @@ from starlette.routing import Route
 from warden.admin import AdminDeps, admin_principal, build_admin_routes, install_sighup_reload
 from warden.approval.stage import Approval
 from warden.approval.store import ApprovalStore
-from warden.approval.web import build_approval_routes
+from warden.approval.web import ApprovalSecurityHeaders, build_approval_routes
 from warden.audit.log import AuditLog
 from warden.audit.stage import AuditWriteAhead, audit_finish_hook
 from warden.auth.api_keys import ApiKeyStore
@@ -49,6 +50,7 @@ from warden.config import (
 )
 from warden.db.engine import Database
 from warden.health import Readiness, postgres_check, redis_check
+from warden.http_limits import RequestLimitsMiddleware
 from warden.logging import configure_logging, get_logger, request_id_var
 from warden.pipeline import Pipeline, Principal
 from warden.policy.stage import Policy
@@ -112,6 +114,14 @@ def protected_resource_metadata_url(resource_url: str) -> str:
 PROTECTED_PREFIXES = (MCP_PATH, "/admin")
 #: A credential here is verified if present and not required. See `AuthMiddleware`.
 OPTIONAL_AUTH_PREFIXES = (METRICS_PATH,)
+#: Every Redis operation is bounded, explicitly. The locked redis-py (8.1.0) already defaults
+#: both timeouts to 5 s - measured: a client with no settings gave up on a silent server after
+#: 5.0 s - but the declared range `redis>=5.2` admits older releases whose defaults differ, and
+#: a security property should not ride on a dependency's default. Set here, a Redis that accepts
+#: the connection and then stops answering raises within 2 s, and the limiter denies exactly as
+#: it does when Redis is down.
+REDIS_CONNECT_TIMEOUT_SECONDS = 2.0
+REDIS_SOCKET_TIMEOUT_SECONDS = 2.0
 
 
 def default_readiness(settings: Settings) -> Readiness:
@@ -234,6 +244,17 @@ def make_protected_resource_metadata(
     return metadata
 
 
+def _in_networks(host: str, networks: Sequence[IPv4Network | IPv6Network]) -> bool:
+    """True when `host` is an IP address inside one of `networks`. Hostnames never match."""
+    if not networks:
+        return False
+    try:
+        address = ip_address(host)
+    except ValueError:
+        return False
+    return any(address in network for network in networks)
+
+
 def make_metrics(
     metrics: Metrics,
     *,
@@ -241,8 +262,9 @@ def make_metrics(
     pins: PinStore,
     approvals: ApprovalStore,
     allow_localhost: bool,
+    allow_networks: Sequence[IPv4Network | IPv6Network] = (),
 ) -> Callable[[Request], Awaitable[Response]]:
-    """Serve Prometheus metrics, to localhost or to an admin.
+    """Serve Prometheus metrics, to localhost, an allowed scraper network, or an admin.
 
     Not public: the series names and label values describe which tools exist, which are
     quarantined and what is being refused - useful to an operator and equally useful to someone
@@ -253,7 +275,7 @@ def make_metrics(
     async def endpoint(request: Request) -> Response:
         client_host = request.client.host if request.client else ""
         local = client_host in ("127.0.0.1", "::1", "localhost", "testclient")
-        if not (allow_localhost and local):
+        if not ((allow_localhost and local) or _in_networks(client_host, allow_networks)):
             principal = admin_principal(request)
             if principal is None:
                 return JSONResponse(
@@ -282,7 +304,11 @@ def build_redis(settings: Settings) -> Any:
     """One Redis client for the whole process: the limiter and the revocation list share it."""
     import redis.asyncio as aioredis
 
-    return aioredis.from_url(settings.redis_url)
+    return aioredis.from_url(
+        settings.redis_url,
+        socket_connect_timeout=REDIS_CONNECT_TIMEOUT_SECONDS,
+        socket_timeout=REDIS_SOCKET_TIMEOUT_SECONDS,
+    )
 
 
 def build_upstream_manager(
@@ -491,6 +517,7 @@ def create_app(
         else InjectionClassifier(
             enabled=gateway.scan.classifier_enabled or settings.classifier_enabled,
             model_id=gateway.scan.classifier_model,
+            revision=gateway.scan.classifier_revision,
             device=gateway.scan.classifier_device,
             timeout_seconds=gateway.scan.classifier_timeout_seconds,
             on_timing=(metrics or _shared_metrics).observe_classifier,
@@ -556,6 +583,7 @@ def create_app(
                     pins=pins,
                     approvals=approvals,
                     allow_localhost=settings.metrics_allow_localhost,
+                    allow_networks=settings.metrics_networks(),
                 ),
                 methods=["GET"],
             )
@@ -648,6 +676,14 @@ def create_app(
         protected_prefixes=PROTECTED_PREFIXES,
         optional_prefixes=OPTIONAL_AUTH_PREFIXES,
         resource_metadata_url=protected_resource_metadata_url(settings.warden_resource_url),
+    )
+    app.add_middleware(ApprovalSecurityHeaders, prefix="/approvals")
+    # Inside the request-id middleware so a 413 still carries an id, outside auth so an
+    # oversized body is refused before anything parses it.
+    app.add_middleware(
+        RequestLimitsMiddleware,
+        max_body_bytes=gateway.limits.max_request_body_bytes,
+        mcp_path=MCP_PATH,
     )
     app.add_middleware(RequestIdMiddleware)
     app.state.settings = settings

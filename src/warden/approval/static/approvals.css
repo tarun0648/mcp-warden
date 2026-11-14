@@ -1,0 +1,32 @@
+/* The approval UI's only stylesheet. Served from the gateway so the page's CSP can be
+   `style-src 'self'`: no inline styles, no style attributes. */
+:root { color-scheme: light dark; --edge: #8884; --warn: #b4531a; --bad: #a3242b; --ok: #1d6b3f; }
+* { box-sizing: border-box; }
+body { font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+       margin: 0; padding: 1.5rem; max-width: 70rem; }
+h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+.sub { color: #7a7a7a; margin: 0 0 1.5rem; }
+.card { border: 1px solid var(--edge); border-radius: 8px; padding: 1rem; margin: 0 0 1rem; }
+.row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: baseline;
+       justify-content: space-between; }
+.tool { font-family: ui-monospace, SFMono-Regular, monospace; font-weight: 600; }
+.meta { color: #7a7a7a; font-size: .85rem; }
+pre { background: #8881; padding: .6rem; border-radius: 6px; overflow-x: auto;
+      font-size: .85rem; margin: .5rem 0; }
+.flags { color: var(--warn); font-size: .85rem; }
+button { font: inherit; padding: .4rem .9rem; border-radius: 6px; border: 1px solid var(--edge);
+         background: #8881; cursor: pointer; }
+button.approve { border-color: var(--ok); color: var(--ok); }
+button.deny { border-color: var(--bad); color: var(--bad); }
+input[type=text], input[type=password] { font: inherit; padding: .4rem .6rem;
+  border-radius: 6px; border: 1px solid var(--edge); background: transparent; width: 100%; }
+form.inline { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .5rem 0 0; }
+.notice { border-left: 3px solid var(--ok); padding: .4rem .8rem; margin: 0 0 1rem;
+          background: #8881; }
+.error { border-left-color: var(--bad); color: var(--bad); }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid var(--edge); }
+.empty { color: #7a7a7a; font-style: italic; }
+h2 { font-size: 1rem; }
+.narrow { max-width: 32rem; }
+.reason { flex: 1 1 14rem; width: auto; }

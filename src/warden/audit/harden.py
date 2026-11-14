@@ -54,6 +54,10 @@ async def harden_audit_table(database: Database, *, grant_to: str | None = None)
             ),
         )
 
+    # Postgres cannot bind identifiers as parameters, so these statements are built as
+    # strings. Every interpolated name is either a module constant (GATEWAY_ROLE, AUDIT_TABLE)
+    # or `grant_target`, which `_quote_ident` has already restricted to [A-Za-z0-9_] and quoted.
+    # Nothing here comes from a request. Bandit's B608 is accepted on that basis.
     async with database.engine.begin() as conn:
         await conn.execute(
             text(
@@ -65,7 +69,7 @@ async def harden_audit_table(database: Database, *, grant_to: str | None = None)
                         CREATE ROLE {GATEWAY_ROLE} NOLOGIN;
                     END IF;
                 END $$;
-                """
+                """  # nosec B608 - constants only, see above
             )
         )
         # Order matters: revoke everything first, including from PUBLIC, then grant back

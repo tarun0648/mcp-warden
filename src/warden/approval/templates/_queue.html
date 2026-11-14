@@ -26,8 +26,7 @@
             hx-post="/approvals/decide" hx-target="#queue" hx-swap="innerHTML">
         <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
         <input type="hidden" name="approval_id" value="{{ item.id }}">
-        <input type="text" name="reason" placeholder="reason (optional)"
-               style="flex: 1 1 14rem; width: auto">
+        <input type="text" name="reason" class="reason" placeholder="reason (optional)">
         <button class="approve" type="submit" name="action" value="approve">Approve</button>
         <button class="deny" type="submit" name="action" value="deny">Deny</button>
       </form>

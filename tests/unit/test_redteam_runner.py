@@ -415,3 +415,36 @@ def test_the_baseline_file_is_committed_and_parses() -> None:
     for run in payload["runs"]:
         assert 0.0 <= run["block_rate"] <= 1.0
         assert 0.0 <= run["false_positive_rate"] <= 1.0
+
+
+# -- the audit chain after the attacks -----------------------------------------------------------
+
+
+def test_a_run_with_no_verified_chain_is_not_ok() -> None:
+    """Absence of evidence must not read as a pass."""
+    from redteam.report import RunScore
+
+    assert not RunScore(label="x").audit_ok
+
+
+def test_one_broken_chain_fails_the_run() -> None:
+    from redteam.report import RunScore
+
+    score = RunScore(label="x", audit_chains=[(10, True), (4, False), (7, True)])
+    assert not score.audit_ok
+    assert score.as_dict()["audit"] == {"gateways": 3, "chains_intact": 2, "rows_verified": 21}
+
+
+def test_every_chain_intact_is_ok_and_reported() -> None:
+    from redteam.report import RunScore, render_markdown
+
+    score = RunScore(label="rules only", audit_chains=[(10, True), (5, True)])
+    assert score.audit_ok
+    payload = {
+        "generated_at": "2026-01-01T00:00:00+00:00",
+        "machine": {"platform": "p", "python": "3.12", "packages": {"mcp": "2"}},
+        "runs": [score.as_dict()],
+    }
+    text = render_markdown(payload, None)
+    assert "## Audit log after the attacks" in text
+    assert "| rules only | 2 | 2/2 | 15 |" in text

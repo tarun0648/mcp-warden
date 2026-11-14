@@ -1,0 +1,25 @@
+# Keep the build context small and, above all, free of secrets and local state.
+.git
+.venv
+.env
+.env.*
+!.env.example
+keys/
+data/
+sandbox/
+results/
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache
+.mypy_cache
+.ruff_cache
+**/__pycache__
+*.pyc
+.audit-requirements.txt
+.DS_Store
+docs/
+tests/
+redteam/
+bench/
+agent/

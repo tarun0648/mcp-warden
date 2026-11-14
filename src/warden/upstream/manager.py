@@ -16,6 +16,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import os
 import random
 import time
 from collections.abc import Mapping
@@ -30,6 +31,23 @@ from warden.config import HttpTransport, ServersConfig, StdioTransport, Upstream
 from warden.logging import get_logger
 
 logger = get_logger(__name__)
+
+#: Variables copied from the gateway's own environment into every stdio upstream it spawns.
+#:
+#: The MCP SDK deliberately gives a child process almost nothing (PATH, HOME and a few more),
+#: so the gateway's DATABASE_URL, Redis URL and signing-key paths never reach an upstream -
+#: including an untrusted one. That property is kept: this list is names, not a prefix, and
+#: each is a setting of the `uv` launcher that `servers.yaml` uses as its command, none of them
+#: secret. A prefix like `UV_*` would also forward `UV_INDEX_URL`, which can carry a private
+#: index's credentials. Anything an upstream itself needs goes in its `env:` in servers.yaml.
+LAUNCHER_ENV_VARS: tuple[str, ...] = (
+    "UV_NO_SYNC",
+    "UV_FROZEN",
+    "UV_OFFLINE",
+    "UV_CACHE_DIR",
+    "UV_PROJECT_ENVIRONMENT",
+    "UV_PYTHON_DOWNLOADS",
+)
 
 INITIAL_BACKOFF_SECONDS = 0.5
 MAX_BACKOFF_SECONDS = 30.0
@@ -78,6 +96,16 @@ def _signature(tools: tuple[Tool, ...]) -> str:
     ).hexdigest()
 
 
+def stdio_env(transport: StdioTransport) -> dict[str, str]:
+    """The extra environment for a stdio upstream: launcher settings, then its own `env:`.
+
+    The upstream's own entries win, so servers.yaml can always override a forwarded value.
+    """
+    env = {name: os.environ[name] for name in LAUNCHER_ENV_VARS if name in os.environ}
+    env.update(transport.env)
+    return env
+
+
 def _client_for(config: UpstreamConfig) -> Client:
     """Build an SDK client for an upstream's transport."""
     transport = config.transport
@@ -86,7 +114,7 @@ def _client_for(config: UpstreamConfig) -> Client:
             StdioServerParameters(
                 command=transport.command,
                 args=list(transport.args),
-                env=dict(transport.env) or None,
+                env=stdio_env(transport) or None,
                 cwd=transport.cwd,
             ),
             read_timeout_seconds=config.timeout_seconds,
@@ -254,7 +282,9 @@ class UpstreamConnection:
 
     async def _sleep_with_jitter(self, seconds: float) -> None:
         """Back off, but return at once if we are shutting down."""
-        delay = seconds * (0.5 + random.random())
+        # Jitter, so a fleet of gateways does not reconnect in lockstep. Not a secret and not
+        # a security decision, so the standard PRNG is the right tool.
+        delay = seconds * (0.5 + random.random())  # nosec B311
         with contextlib.suppress(TimeoutError):
             async with asyncio.timeout(delay):
                 await self._stop.wait()

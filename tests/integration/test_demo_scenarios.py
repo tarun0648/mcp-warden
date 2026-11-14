@@ -174,5 +174,5 @@ async def test_a_poisoned_description_never_reaches_the_model_verbatim(tmp_path:
     )
     for definition in outcomes[0].transcript.tool_definitions:
         text = definition.get("function", {}).get("description", "")
-        assert "​" not in text
+        assert "\u200b" not in text
         assert "\n" not in text

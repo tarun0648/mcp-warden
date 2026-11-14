@@ -70,6 +70,12 @@ def serve(
         host=host or settings.warden_host,
         port=port or settings.warden_port,
         log_config=None,
+        # Stated rather than inherited, so a reviewer can see every I/O bound in one place:
+        # an idle keep-alive connection is dropped after 5 s, and shutdown waits at most 10 s
+        # for in-flight calls. Request bodies are bounded by RequestLimitsMiddleware and
+        # header size by h11's own 16 KiB limit.
+        timeout_keep_alive=5,
+        timeout_graceful_shutdown=10,
     )
 
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import re
 from enum import StrEnum
+from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal, Self
 
@@ -179,8 +180,21 @@ class LimitsConfig(StrictModel):
     roles: dict[str, RoleLimits] = Field(default_factory=dict)
     max_result_bytes: int = Field(default=256 * 1024, ge=1024)
     max_argument_bytes: int = Field(default=64 * 1024, ge=256)
+    #: The whole HTTP request body, refused with 413 before anything parses it. Must leave room
+    #: for the largest permitted arguments plus the JSON-RPC envelope around them.
+    max_request_body_bytes: int = Field(default=1024 * 1024, ge=1024)
     #: Fail-open is for local development only and logs a warning on every use.
     fail_open_when_limiter_down: bool = False
+
+    @model_validator(mode="after")
+    def _body_fits_arguments(self) -> Self:
+        if self.max_request_body_bytes < self.max_argument_bytes:
+            raise ValueError(
+                f"max_request_body_bytes ({self.max_request_body_bytes}) is smaller than "
+                f"max_argument_bytes ({self.max_argument_bytes}), so a call with permitted "
+                "arguments could never arrive"
+            )
+        return self
 
     def for_roles(self, roles: tuple[str, ...]) -> RoleLimits:
         """The most generous limits among the principal's roles, else the default."""
@@ -195,6 +209,11 @@ class ScanConfig(StrictModel):
 
     classifier_enabled: bool = False
     classifier_model: str = "protectai/deberta-v3-base-prompt-injection-v2"
+    #: A full 40-character commit hash, never a branch or tag name: those are mutable. The
+    #: default is the commit every published measurement was made with.
+    classifier_revision: str = Field(
+        default="90c9989b1a342275dd0d1a95aad283c04e075671", pattern=r"^[0-9a-f]{40}$"
+    )
     #: 0.999, not the 0.8 this started at. Measured on tests/data (46 attacks, 46 benign):
     #: at 0.8 the model flagged 17.4% of ordinary text, scoring "Never store credentials in the
     #: repository; use the secret store." at 1.0000 - the same as a real injection. No
@@ -267,6 +286,31 @@ class Settings(BaseSettings):
     #: Allow an unauthenticated scrape from loopback, which is how a sidecar Prometheus
     #: reaches /metrics. Any other client needs the admin role.
     metrics_allow_localhost: bool = True
+    #: Further networks allowed to scrape /metrics without a credential, as comma-separated
+    #: CIDRs. Empty by default. Set by docker-compose to its own private bridge subnet, which
+    #: is how a Prometheus *container* reaches a gateway container - not over loopback.
+    metrics_allow_networks: str = ""
+
+    def metrics_networks(self) -> list[IPv4Network | IPv6Network]:
+        """The parsed CIDRs; an unparseable entry is a configuration error, not ignored."""
+        networks: list[IPv4Network | IPv6Network] = []
+        for raw in self.metrics_allow_networks.split(","):
+            entry = raw.strip()
+            if not entry:
+                continue
+            try:
+                networks.append(ip_network(entry, strict=True))
+            except ValueError as exc:
+                raise ConfigError(
+                    "environment", "METRICS_ALLOW_NETWORKS", f"'{entry}' is not a CIDR: {exc}"
+                ) from exc
+            if networks[-1].prefixlen == 0:
+                raise ConfigError(
+                    "environment",
+                    "METRICS_ALLOW_NETWORKS",
+                    f"'{entry}' would allow every address; name the scraper's network",
+                )
+        return networks
 
     #: Host headers the MCP endpoint accepts, comma separated. DNS-rebinding protection
     #: rejects anything else, which is what stops a web page from driving a local gateway.
@@ -334,17 +378,23 @@ def load_servers_config(path: Path | str) -> ServersConfig:
 
 
 def _expand_env(config: ServersConfig) -> ServersConfig:
-    """Replace `${VAR}` in stdio env values and http urls with the process environment.
+    """Replace `${VAR}` in stdio env values, args and http urls with the process environment.
 
     This is how upstream credentials reach an upstream without ever being written to the repo.
     An unset variable is an error, not an empty string, so a missing secret fails loudly.
+
+    `${VAR:-default}` is the one exception, and it is opt-in per reference: it is for settings
+    that legitimately differ between a laptop and a container (a data path), never for a
+    secret, where a silent default would be exactly the failure the strict form prevents.
     """
-    pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)\}")
+    pattern = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}")
 
     def expand(value: str, where: str) -> str:
         def replace(match: re.Match[str]) -> str:
-            name = match.group(1)
+            name, default = match.group(1), match.group(2)
             resolved = os.environ.get(name)
+            if resolved is None and default is not None:
+                return default
             if resolved is None:
                 raise ConfigError(
                     "servers.yaml",

@@ -42,6 +42,15 @@ class RunScore:
 
     label: str
     results: list[CaseResult] = field(default_factory=list)
+    #: One entry per gateway the run used: (rows verified, chain intact). Every case runs
+    #: against a real hash-chained audit log, and after the attacks have been thrown at it the
+    #: chain must still verify - an attack that corrupted the log would otherwise score as
+    #: "blocked" while destroying the evidence of itself.
+    audit_chains: list[tuple[int, bool]] = field(default_factory=list)
+
+    @property
+    def audit_ok(self) -> bool:
+        return bool(self.audit_chains) and all(ok for _rows, ok in self.audit_chains)
 
     @property
     def attacks(self) -> list[CaseResult]:
@@ -107,6 +116,11 @@ class RunScore:
             "benign_allowed": self.allowed_benign,
             "false_positive_rate": round(self.false_positive_rate, 4),
             "errors": self.errors,
+            "audit": {
+                "gateways": len(self.audit_chains),
+                "chains_intact": sum(1 for _rows, ok in self.audit_chains if ok),
+                "rows_verified": sum(rows for rows, _ok in self.audit_chains),
+            },
             "categories": [
                 {
                     "category": c.category,
@@ -243,6 +257,24 @@ def render_markdown(payload: dict[str, Any], baseline: dict[str, Any] | None) ->
             f"{run['block_rate']:.1%} | {run['benign_allowed']}/{run['benign']} | "
             f"{run['false_positive_rate']:.1%} | {run['errors']} |"
         )
+
+    if all("audit" in run for run in runs):
+        lines += [
+            "",
+            "## Audit log after the attacks",
+            "",
+            "Each gateway's hash chain is verified after its cases have run, so an attack that "
+            "damaged the log cannot score as blocked.",
+            "",
+            "| Configuration | Gateways | Chains intact | Rows verified |",
+            "| --- | --- | --- | --- |",
+        ]
+        for run in runs:
+            audit = run["audit"]
+            lines.append(
+                f"| {run['label']} | {audit['gateways']} | {audit['chains_intact']}/"
+                f"{audit['gateways']} | {audit['rows_verified']} |"
+            )
 
     lines += ["", "## By category", ""]
     categories = sorted({c["category"] for run in runs for c in run["categories"]})

@@ -33,6 +33,11 @@ from warden.logging import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_MODEL: Final = "protectai/deberta-v3-base-prompt-injection-v2"
+#: The exact commit of `DEFAULT_MODEL` every measurement in results/ and docs/decisions.md was
+#: made with. A model id alone names a mutable branch: whoever controls the repository can push
+#: new weights under it, and the gateway would load them on its next start. Pinning the commit
+#: makes the weights part of the reviewed configuration, like a lockfile entry.
+DEFAULT_REVISION: Final = "90c9989b1a342275dd0d1a95aad283c04e075671"
 #: The label that means "this text is trying to steer the model".
 INJECTION_LABEL: Final = "INJECTION"
 SAFE_LABEL: Final = "SAFE"
@@ -74,12 +79,14 @@ class InjectionClassifier:
         *,
         enabled: bool = False,
         model_id: str = DEFAULT_MODEL,
+        revision: str = DEFAULT_REVISION,
         device: str = "auto",
         timeout_seconds: float = 2.0,
         on_timing: Any | None = None,
     ) -> None:
         self.enabled = enabled
         self.model_id = model_id
+        self.revision = revision
         self.requested_device = device
         self.timeout_seconds = timeout_seconds
         #: `on_timing(seconds)` after every inference, including a failed one. Wired to the
@@ -119,8 +126,13 @@ class InjectionClassifier:
                 )
 
                 device = self._resolve_device()
-                tokenizer = AutoTokenizer.from_pretrained(self.model_id)
-                model = AutoModelForSequenceClassification.from_pretrained(self.model_id)
+                # Pinned to a commit, and safetensors only: a pickle checkpoint executes code
+                # when it is loaded, which would make "download a model" mean "run whatever the
+                # model's author shipped". Loading fails rather than falling back.
+                tokenizer = AutoTokenizer.from_pretrained(self.model_id, revision=self.revision)
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    self.model_id, revision=self.revision, use_safetensors=True
+                )
                 self._pipeline = pipeline(
                     "text-classification",
                     model=model,
@@ -132,7 +144,13 @@ class InjectionClassifier:
                 self.device = device
                 logger.warning(
                     "injection classifier loaded",
-                    extra={"warden": {"model": self.model_id, "device": device}},
+                    extra={
+                        "warden": {
+                            "model": self.model_id,
+                            "revision": self.revision,
+                            "device": device,
+                        }
+                    },
                 )
             except Exception as exc:
                 self._load_error = f"{type(exc).__name__}: {exc}"[:300]
@@ -240,6 +258,7 @@ def _as_predictions(raw: Any) -> list[dict[str, Any]]:
 __all__ = [
     "CHARS_PER_TOKEN",
     "DEFAULT_MODEL",
+    "DEFAULT_REVISION",
     "INJECTION_LABEL",
     "MAX_WINDOWS",
     "SAFE_LABEL",

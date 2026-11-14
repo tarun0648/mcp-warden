@@ -269,3 +269,119 @@ def test_gateway_config_defaults_are_fail_closed() -> None:
     assert config.limits.fail_open_when_limiter_down is False
     assert config.scan.classifier_enabled is False
     assert config.approval.allow_self_approval is False
+
+
+def test_a_body_limit_smaller_than_the_argument_limit_is_refused() -> None:
+    """Otherwise a call with permitted arguments could never arrive, which would look like a bug."""
+    from warden.config import LimitsConfig
+
+    with pytest.raises(ValueError, match="max_request_body_bytes"):
+        LimitsConfig(max_argument_bytes=65536, max_request_body_bytes=4096)
+
+
+def test_the_shipped_body_limit_leaves_room_for_the_largest_arguments() -> None:
+    from warden.config import load_gateway_config
+
+    limits = load_gateway_config(
+        Path(__file__).resolve().parents[2] / "config" / "gateway.yaml"
+    ).limits
+    assert limits.max_request_body_bytes >= 2 * limits.max_argument_bytes
+
+
+def test_the_shipped_config_pins_the_classifier_to_a_commit() -> None:
+    import re
+
+    from warden.config import load_gateway_config
+
+    scan = load_gateway_config(Path(__file__).resolve().parents[2] / "config" / "gateway.yaml").scan
+    assert re.fullmatch(r"[0-9a-f]{40}", scan.classifier_revision)
+
+
+def test_metrics_networks_parse_and_default_to_none() -> None:
+    from warden.config import Settings
+
+    assert Settings(metrics_allow_networks="").metrics_networks() == []
+    parsed = Settings(metrics_allow_networks="172.28.0.0/24, fd00::/64").metrics_networks()
+    assert [str(n) for n in parsed] == ["172.28.0.0/24", "fd00::/64"]
+
+
+@pytest.mark.parametrize("value", ["0.0.0.0/0", "::/0"])
+def test_a_metrics_network_that_allows_everyone_is_refused(value: str) -> None:
+    from warden.config import Settings
+    from warden.errors import ConfigError
+
+    with pytest.raises(ConfigError, match="every address"):
+        Settings(metrics_allow_networks=value).metrics_networks()
+
+
+@pytest.mark.parametrize("value", ["prometheus", "172.28.0.1/24", "10.0.0.0/33"])
+def test_a_malformed_metrics_network_is_a_config_error_not_ignored(value: str) -> None:
+    """`172.28.0.1/24` has host bits set: probably a typo for the subnet, so say so."""
+    from warden.config import Settings
+    from warden.errors import ConfigError
+
+    with pytest.raises(ConfigError, match="METRICS_ALLOW_NETWORKS"):
+        Settings(metrics_allow_networks=value).metrics_networks()
+
+
+def _stdio_servers(tmp_path: Path, env_value: str) -> Path:
+    path = tmp_path / "servers.yaml"
+    path.write_text(
+        "upstreams:\n"
+        "  - name: notes\n"
+        "    transport:\n"
+        "      kind: stdio\n"
+        "      command: python\n"
+        f"      env: {{NOTES_DB_PATH: '{env_value}'}}\n"
+    )
+    return path
+
+
+def test_a_default_is_used_when_the_variable_is_unset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("WARDEN_TEST_DB", raising=False)
+    config = load_servers_config(_stdio_servers(tmp_path, "${WARDEN_TEST_DB:-./data/n.sqlite3}"))
+    transport = config.upstreams[0].transport
+    assert isinstance(transport, StdioTransport)
+    assert transport.env == {"NOTES_DB_PATH": "./data/n.sqlite3"}
+
+
+def test_a_set_variable_beats_its_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WARDEN_TEST_DB", "/var/lib/warden/data/n.sqlite3")
+    config = load_servers_config(_stdio_servers(tmp_path, "${WARDEN_TEST_DB:-./data/n.sqlite3}"))
+    transport = config.upstreams[0].transport
+    assert isinstance(transport, StdioTransport)
+    assert transport.env["NOTES_DB_PATH"] == "/var/lib/warden/data/n.sqlite3"
+
+
+def test_the_strict_form_still_fails_loudly_next_to_a_defaulted_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A default is opt-in per reference; it must not relax its neighbours."""
+    monkeypatch.delenv("WARDEN_TEST_DB", raising=False)
+    monkeypatch.delenv("WARDEN_TEST_SECRET", raising=False)
+    path = _stdio_servers(tmp_path, "${WARDEN_TEST_DB:-x}${WARDEN_TEST_SECRET}")
+    with pytest.raises(ConfigError, match="WARDEN_TEST_SECRET"):
+        load_servers_config(path)
+
+
+def test_an_empty_default_is_allowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("WARDEN_TEST_DB", raising=False)
+    config = load_servers_config(_stdio_servers(tmp_path, "${WARDEN_TEST_DB:-}"))
+    transport = config.upstreams[0].transport
+    assert isinstance(transport, StdioTransport)
+    assert transport.env["NOTES_DB_PATH"] == ""
+
+
+def test_the_shipped_servers_config_loads_without_any_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`make run` on a fresh clone exports nothing; the shipped file must still load."""
+    for name in ("NOTES_DB_PATH", "FILES_SANDBOX_ROOT"):
+        monkeypatch.delenv(name, raising=False)
+    root = Path(__file__).resolve().parents[2]
+    config = load_servers_config(root / "config" / "servers.yaml")
+    by_name = {u.name: u.transport for u in config.upstreams}
+    assert by_name["notes_db"].env["NOTES_DB_PATH"] == "./data/notes.sqlite3"  # type: ignore[union-attr]
+    assert by_name["files"].env["FILES_SANDBOX_ROOT"] == "./sandbox"  # type: ignore[union-attr]

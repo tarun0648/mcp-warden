@@ -7,6 +7,10 @@ upstreams:
       kind: stdio
       command: uv
       args: ["run", "python", "-m", "servers.notes_db"]
+      # Defaults are relative to the repo for `make run`; the container image sets an
+      # absolute path on a volume.
+      env:
+        NOTES_DB_PATH: "${NOTES_DB_PATH:-./data/notes.sqlite3}"
     enabled: true
     trusted: true
     timeout_seconds: 20.0
@@ -20,6 +24,8 @@ upstreams:
       kind: stdio
       command: uv
       args: ["run", "python", "-m", "servers.files"]
+      env:
+        FILES_SANDBOX_ROOT: "${FILES_SANDBOX_ROOT:-./sandbox}"
     enabled: true
     trusted: true
     timeout_seconds: 20.0

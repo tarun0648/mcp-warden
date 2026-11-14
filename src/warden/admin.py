@@ -38,6 +38,10 @@ ADMIN_ROLE = "admin"
 Handler = Callable[[Request], Awaitable[Response]]
 
 
+def _unauthorized() -> Response:
+    return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+
 def _bad_request(reason: str) -> Response:
     return JSONResponse({"error": "bad_request", "error_description": reason}, status_code=400)
 
@@ -202,7 +206,10 @@ def build_admin_routes(deps: AdminDeps) -> list[Route]:
     @require_admin
     async def approve_pin(request: Request) -> Response:
         principal = admin_principal(request)
-        assert principal is not None  # require_admin guarantees it
+        # `require_admin` guarantees this; checked explicitly because an assert
+        # disappears under `python -O`, and an authorization check must not.
+        if principal is None:
+            return _unauthorized()
         parts = split_namespaced(request.path_params["tool"])
         if parts is None:
             return _bad_request("the tool must be named <server>__<tool>")
@@ -213,7 +220,10 @@ def build_admin_routes(deps: AdminDeps) -> list[Route]:
     @require_admin
     async def quarantine_pin(request: Request) -> Response:
         principal = admin_principal(request)
-        assert principal is not None
+        # `require_admin` guarantees this; checked explicitly because an assert
+        # disappears under `python -O`, and an authorization check must not.
+        if principal is None:
+            return _unauthorized()
         parts = split_namespaced(request.path_params["tool"])
         if parts is None:
             return _bad_request("the tool must be named <server>__<tool>")
@@ -232,7 +242,10 @@ def build_admin_routes(deps: AdminDeps) -> list[Route]:
     @require_admin
     async def decide_approval(request: Request) -> Response:
         principal = admin_principal(request)
-        assert principal is not None
+        # `require_admin` guarantees this; checked explicitly because an assert
+        # disappears under `python -O`, and an authorization check must not.
+        if principal is None:
+            return _unauthorized()
         approval_id = request.path_params["approval_id"]
         action = request.path_params["action"]
         if action not in ("approve", "deny"):

@@ -313,6 +313,10 @@ async def run_suite(
                 score.results.append(result)
                 mark = "ok " if result.passed else "FAIL"
                 print(f"  [{mark}] {case.id:<28} {case.category:<22} {result.detail}")
+            verified = await gateway.on_server_loop(gateway.app.state.audit.verify())
+            score.audit_chains.append((verified.rows_checked, verified.ok))
+            if not verified.ok:
+                print(f"  [FAIL] audit chain broken at {verified.first_break}")
     return score
 
 
@@ -427,6 +431,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  - {gap}")
 
     exit_code = 0
+    if not all(run.audit_ok for run in runs):
+        print("\nFAIL: an audit chain did not verify after the attacks", file=sys.stderr)
+        exit_code = 1
     if any(run.errors for run in runs):
         print("\nFAIL: some cases errored rather than producing a verdict", file=sys.stderr)
         exit_code = 1

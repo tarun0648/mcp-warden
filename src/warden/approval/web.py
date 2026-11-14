@@ -44,6 +44,42 @@ CSRF_FIELD: Final = "csrf_token"
 SESSION_TTL_SECONDS: Final = 8 * 60 * 60
 ADMIN_ROLE: Final = "admin"
 TEMPLATE_DIR: Final = Path(__file__).parent / "templates"
+STATIC_DIR: Final = Path(__file__).parent / "static"
+STYLESHEET_PATH: Final = "/approvals/static/approvals.css"
+#: The one script the page loads, by exact URL. A CSP source with a full path matches that file
+#: only, so even a compromised unpkg could not serve this page anything else - and the SRI hash
+#: in base.html pins the file's bytes on top of that.
+HTMX_URL: Final = "https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+
+#: Every value on this page is attacker-controlled (tool names, arguments, scan evidence), so
+#: the page is locked down as if an injection had already got past autoescaping:
+#: no inline script or style, nothing loaded from anywhere but here and the pinned htmx file,
+#: no framing, forms that can only post back to this origin.
+CONTENT_SECURITY_POLICY: Final = "; ".join(
+    [
+        "default-src 'none'",
+        f"script-src {HTMX_URL}",
+        "style-src 'self'",
+        "connect-src 'self'",
+        "img-src 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+    ]
+)
+SECURITY_HEADERS: Final[tuple[tuple[str, str], ...]] = (
+    ("content-security-policy", CONTENT_SECURITY_POLICY),
+    # Clickjacking: an approve button inside someone else's frame is the attack. CSP's
+    # frame-ancestors covers modern browsers; X-Frame-Options covers the rest.
+    ("x-frame-options", "DENY"),
+    # The page URL is not secret, but an approval decision should not announce itself to
+    # whatever a link on it points at.
+    ("referrer-policy", "no-referrer"),
+    ("x-content-type-options", "nosniff"),
+    # Pending arguments are sensitive and change by the second: never cache them.
+    ("cache-control", "no-store"),
+    ("cross-origin-opener-policy", "same-origin"),
+)
 
 
 @dataclass(slots=True)
@@ -260,7 +296,13 @@ def build_approval_routes(
             )
         )
 
+    css = (STATIC_DIR / "approvals.css").read_bytes()
+
+    async def stylesheet(_: Request) -> Response:
+        return Response(css, media_type="text/css; charset=utf-8")
+
     return [
+        Route(STYLESHEET_PATH, stylesheet, methods=["GET"]),
         Route("/approvals", index, methods=["GET"]),
         Route("/approvals/queue", queue_fragment, methods=["GET"]),
         Route("/approvals/login", login, methods=["POST"]),
@@ -271,11 +313,48 @@ def build_approval_routes(
 
 Handler = Callable[[Request], Awaitable[Response]]
 
+
+class ApprovalSecurityHeaders:
+    """Add `SECURITY_HEADERS` to every response under `/approvals`.
+
+    Middleware rather than per-handler, so a handler added later cannot forget them - including
+    the 401/403 fragments and redirects, which are exactly the responses that tend to be
+    written in a hurry.
+    """
+
+    def __init__(self, app: Callable[..., Awaitable[None]], *, prefix: str = "/approvals") -> None:
+        self.app = app
+        self.prefix = prefix
+
+    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:  # type: ignore[type-arg]
+        path = str(scope.get("path", ""))
+        if scope["type"] != "http" or not (
+            path == self.prefix or path.startswith(self.prefix + "/")
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: dict) -> None:  # type: ignore[type-arg]
+            if message["type"] == "http.response.start":
+                present = {bytes(k).lower() for k, _ in message.get("headers", [])}
+                headers = list(message.get("headers", []))
+                for name, value in SECURITY_HEADERS:
+                    if name.encode() not in present:
+                        headers.append((name.encode(), value.encode()))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 __all__ = [
     "ADMIN_ROLE",
+    "CONTENT_SECURITY_POLICY",
     "CSRF_FIELD",
+    "SECURITY_HEADERS",
     "SESSION_COOKIE",
     "SESSION_TTL_SECONDS",
+    "ApprovalSecurityHeaders",
     "Session",
     "SessionStore",
     "build_approval_routes",

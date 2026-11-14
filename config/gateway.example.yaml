@@ -23,11 +23,15 @@ limits:
       daily_destructive_calls: 200
   max_result_bytes: 262144
   max_argument_bytes: 65536
+  # The whole HTTP body, refused with 413 before anything parses it.
+  max_request_body_bytes: 1048576
   fail_open_when_limiter_down: false
 
 scan:
   classifier_enabled: false
   classifier_model: protectai/deberta-v3-base-prompt-injection-v2
+  # A commit, not a branch: the weights every measurement was made with.
+  classifier_revision: 90c9989b1a342275dd0d1a95aad283c04e075671
   # Measured, not guessed: see docs/decisions.md. At 0.8 this model flags ordinary
   # security prose as often as real injections.
   classifier_threshold: 0.999

@@ -55,7 +55,9 @@ KEPT_KEYWORDS: Final[frozenset[str]] = frozenset(
 
 #: Characters that are invisible or change reading order. Stripped from any text that reaches
 #: the model, for the same reason the gateway's scanner flags them.
-_INVISIBLE: Final = re.compile(r"[​-‏‪-‮⁠-⁤⁦-⁩﻿\U000e0000-\U000e007f]")
+_INVISIBLE: Final = re.compile(
+    r"[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\U000e0000-\U000e007f]"
+)
 
 
 class UnusableTool(ValueError):

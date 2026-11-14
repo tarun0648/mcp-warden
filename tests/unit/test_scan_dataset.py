@@ -229,6 +229,7 @@ def test_rules_plus_classifier_rates(capsys: pytest.CaptureFixture[str]) -> None
     classifier = InjectionClassifier(
         enabled=True,
         model_id=config.classifier_model,
+        revision=config.classifier_revision,
         # The first call downloads the weights, which is not what the timeout is for.
         timeout_seconds=300.0,
     )

@@ -76,7 +76,10 @@ def redis_check(redis_url: str) -> Check:
     async def check() -> str | None:
         import redis.asyncio as aioredis
 
-        client: aioredis.Redis = aioredis.from_url(redis_url)
+        # Bounded, so a hung Redis makes readiness report "down" instead of hanging the probe.
+        client: aioredis.Redis = aioredis.from_url(
+            redis_url, socket_connect_timeout=2.0, socket_timeout=2.0
+        )
         try:
             await client.ping()
         finally:

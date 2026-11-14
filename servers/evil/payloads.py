@@ -12,12 +12,12 @@ from typing import Final
 
 # Invisible and direction-flipping characters. A human reading the tool list sees nothing;
 # a model reading the raw string sees whatever sits between them.
-ZERO_WIDTH_SPACE: Final = "​"
-ZERO_WIDTH_NON_JOINER: Final = "‌"
-LEFT_TO_RIGHT_OVERRIDE: Final = "‭"
-RIGHT_TO_LEFT_OVERRIDE: Final = "‮"
-POP_DIRECTIONAL: Final = "‬"
-BYTE_ORDER_MARK: Final = "﻿"
+ZERO_WIDTH_SPACE: Final = "\u200b"
+ZERO_WIDTH_NON_JOINER: Final = "\u200c"
+LEFT_TO_RIGHT_OVERRIDE: Final = "\u202d"
+RIGHT_TO_LEFT_OVERRIDE: Final = "\u202e"
+POP_DIRECTIONAL: Final = "\u202c"
+BYTE_ORDER_MARK: Final = "\ufeff"
 TAG_LATIN_SMALL_A: Final = "\U000e0061"
 
 #: Tool poisoning: a hidden instruction block inside an otherwise ordinary description.

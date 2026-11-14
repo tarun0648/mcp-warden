@@ -27,6 +27,8 @@ logger = get_logger(__name__)
 #: One 64-bit key per lock we take. Postgres advisory locks are global to the database, so a
 #: fixed, documented key stops two features from colliding.
 AUDIT_CHAIN_LOCK_KEY = 0x7761_7264_656E_0001
+POSTGRES_CONNECT_TIMEOUT_SECONDS = 5.0
+POSTGRES_COMMAND_TIMEOUT_SECONDS = 10.0
 
 
 class Database:
@@ -40,7 +42,17 @@ class Database:
             _ensure_sqlite_directory(url)
         # SQLite's default isolation makes concurrent writers fail with "database is locked";
         # WAL plus a busy timeout is applied per connection in `prepare`.
-        defaults: dict[str, Any] = {"timeout": 30} if url.startswith("sqlite") else {}
+        # Postgres: asyncpg's `timeout` bounds connecting and `command_timeout` bounds every
+        # statement, so a database that stops answering raises instead of hanging. For the audit
+        # write-ahead that raise is what turns "Postgres hung" into a denial (hard rule 1).
+        defaults: dict[str, Any] = (
+            {"timeout": 30}
+            if url.startswith("sqlite")
+            else {
+                "timeout": POSTGRES_CONNECT_TIMEOUT_SECONDS,
+                "command_timeout": POSTGRES_COMMAND_TIMEOUT_SECONDS,
+            }
+        )
         # `connect_args` is how a deployment pins a Postgres search_path or statement timeout:
         # asyncpg takes those as `server_settings`, not as URL parameters.
         self.engine: AsyncEngine = create_async_engine(

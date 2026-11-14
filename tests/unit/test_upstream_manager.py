@@ -272,3 +272,69 @@ async def test_health_dict_is_serialisable() -> None:
         assert snapshot["last_error"] is None
     finally:
         await manager.stop()
+
+
+# -- what a stdio upstream's process environment contains ---------------------------------------
+
+
+def test_launcher_settings_are_forwarded_to_a_stdio_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from warden.config import StdioTransport
+    from warden.upstream.manager import stdio_env
+
+    monkeypatch.setenv("UV_NO_SYNC", "1")
+    monkeypatch.setenv("UV_CACHE_DIR", "/tmp/uv-cache")
+    env = stdio_env(StdioTransport(command="uv"))
+    assert env == {"UV_NO_SYNC": "1", "UV_CACHE_DIR": "/tmp/uv-cache"}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "JWT_KEY_DIR",
+        "UV_INDEX_URL",
+        "UV_EXTRA_INDEX_URL",
+        "AWS_SECRET_ACCESS_KEY",
+    ],
+)
+def test_nothing_outside_the_allowlist_reaches_an_upstream(
+    monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """The gateway's own secrets stay with the gateway, including a private index token."""
+    from warden.config import StdioTransport
+    from warden.upstream.manager import stdio_env
+
+    monkeypatch.setenv(name, "https://user:s3cret@example.invalid/simple")
+    assert name not in stdio_env(StdioTransport(command="uv"))
+
+
+def test_the_allowlist_names_variables_not_a_prefix() -> None:
+    from warden.upstream.manager import LAUNCHER_ENV_VARS
+
+    assert all(name.startswith("UV_") and "INDEX" not in name for name in LAUNCHER_ENV_VARS)
+    assert "UV_INDEX_URL" not in LAUNCHER_ENV_VARS
+
+
+def test_an_upstreams_own_env_wins_over_a_forwarded_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from warden.config import StdioTransport
+    from warden.upstream.manager import stdio_env
+
+    monkeypatch.setenv("UV_NO_SYNC", "1")
+    env = stdio_env(StdioTransport(command="uv", env={"UV_NO_SYNC": "0", "X": "y"}))
+    assert env == {"UV_NO_SYNC": "0", "X": "y"}
+
+
+def test_with_nothing_to_forward_the_upstream_gets_only_its_own_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from warden.config import StdioTransport
+    from warden.upstream.manager import LAUNCHER_ENV_VARS, stdio_env
+
+    for name in LAUNCHER_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    assert stdio_env(StdioTransport(command="python")) == {}

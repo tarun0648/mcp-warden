@@ -641,3 +641,136 @@ Two verification attempts for the `mcp-remote` stdio bridge were blocked by this
 own safety tooling (passing an API key into a third-party npm package), so that path is
 documented from its own README and labelled unverified rather than described as if it had been
 run.
+
+## Phase 13 - hardening, threat model, release
+
+### Found by reading the SDK, not by assuming
+
+- **The MCP transport buffers the whole request body with no cap.** `await request.body()`
+  runs before any stage, so `max_argument_bytes` was checked long after an arbitrarily large
+  body had been held in memory. `RequestLimitsMiddleware` now refuses with 413: up front on a
+  declared `Content-Length`, and by counting bytes when the body is chunked or the header lies.
+  Pure ASGI, because Starlette's `BaseHTTPMiddleware` buffers responses and would break the SSE
+  streams the transport uses.
+- **The batch limit is zero.** Batching was removed from MCP in 2025-06-18. The SDK happens to
+  reject an array body because its message adapter does not accept one, but a security property
+  should not rest on a third-party validator's incidental behaviour - and a batch would put
+  several calls behind one HTTP request, which is exactly what per-request audit and rate-limit
+  accounting assume cannot happen. The gateway refuses it itself with JSON-RPC -32600.
+- **The SDK starts stdio upstreams with an almost empty environment.** That is deliberate on the
+  SDK's part - `DATABASE_URL` does not leak to a child - and it is why the containerised gateway
+  first came up *healthy* with *both upstreams dead*: `uv` could not find its no-sync setting or
+  a writable cache. Two changes, both narrow. `servers.yaml` gained `${VAR:-default}`, opt-in
+  per reference, so one file serves a laptop (relative data paths) and a container (volume
+  paths); the strict `${VAR}` form still fails loudly on a missing secret. And the gateway
+  forwards a *named* list of six `uv` launcher settings to stdio children - names, not a `UV_*`
+  prefix, because `UV_INDEX_URL` can carry a private index's credentials.
+- **Liveness is not readiness.** The container's healthcheck is `/healthz`, which is right for a
+  restart policy, and it reported healthy while no tool was callable. The end-to-end check that
+  caught it was a real MCP session through the container, which is now how `make up-all` is
+  verified in this entry rather than by the healthcheck alone.
+
+### Timeouts on every I/O, and one comment corrected by measurement
+
+Redis now has explicit 2 s connect and socket timeouts; Postgres has a 5 s connect and 10 s
+statement timeout; uvicorn's keep-alive and graceful-shutdown bounds are stated in `serve`.
+
+The first draft of the Redis comment said that without these a silent Redis "hangs every
+request forever". A throwaway check against a server that accepts and never answers said
+otherwise: the locked redis-py 8.1.0 already gives up after 5.0 s. The comment now says that,
+and why the explicit setting stays - the declared range `redis>=5.2` admits releases with other
+defaults, and 2 s is tighter. The test bound is 4.5 s, so it passes only if the gateway's
+setting is the one in force, not the library's default.
+
+### Approval UI: a CSP the page actually works under
+
+`default-src 'none'`, `script-src` naming the one pinned htmx file by full URL (with the SRI
+hash on top), `style-src 'self'`, `frame-ancestors 'none'`, `form-action 'self'`, plus
+`X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `nosniff` and `Cache-Control:
+no-store`. To make `style-src 'self'` possible the inline `<style>` block and four `style=`
+attributes moved to a served stylesheet, and htmx is configured not to inject its own styles
+and never to evaluate code (`allowEval: false`, `allowScriptTags: false`). Verified in a real
+browser rather than assumed: htmx 2.0.4 loads, its XHR is not blocked by `connect-src`, no
+`<style>` element exists, and the console shows no violation.
+
+### bandit and pip-audit
+
+bandit over `src/warden` and `servers` found eleven issues. All are resolved:
+
+| Finding | Resolution |
+| --- | --- |
+| B613 trojan source (bidi characters in `text_rules.py`, `payloads.py`) | fixed: written as `\u` escapes. A follow-up scan found 34 lines of Python across source and tests, and six characters in one data file, with literal invisible characters; all escaped, and `test_source_hygiene.py` now forbids them in every text file |
+| B615 Hugging Face download without a revision | fixed: pinned to the commit every measurement was made with, `use_safetensors=True` so a pickle checkpoint cannot execute on load; a branch name or short hash is a config error |
+| B101 `assert` in five places (three of them authorization checks) | fixed: explicit checks, because `python -O` removes asserts |
+| B608 SQL built from strings in `harden.py` | accepted with `# nosec`: Postgres cannot bind identifiers, every interpolated name is a module constant or has passed `_quote_ident`'s `[A-Za-z0-9_]` check, and nothing comes from a request |
+| B311 `random` for reconnect jitter | accepted with `# nosec`: jitter is not a security decision |
+
+pip-audit over the full locked set (every group and extra) found seven advisories, all in
+`cryptography 47.0.0`, all fixed by 50.0.0. The pyproject cap `<48` was what held it back; it is
+now `>=50.0.2,<51`, and the audit is clean. Both tools run as `make security`.
+
+### Container
+
+Two stages, base images pinned by tag *and* digest, `uv sync --frozen` so a lock that disagrees
+with pyproject fails the build, uid 10001 with no login shell, and designed for
+`read_only: true` with a `/tmp` tmpfs and named volumes under `/var/lib/warden`. Compose adds
+`cap_drop: [ALL]` and `no-new-privileges`. Image sizes are recorded by `make image-sizes`;
+most of the `WITH_ML` image is PyPI's linux/arm64 torch wheel, which is a CUDA build - a
+CPU-only index would shrink it and is on the roadmap.
+
+**Every port compose published was on 0.0.0.0** - including Redis, which has no password, and
+Postgres with a dev password - so anyone on the same Wi-Fi could flush the rate limiter. All are
+now bound to 127.0.0.1, and the database host ports are overridable for machines that already
+run Postgres or Redis.
+
+A containerised Prometheus does not scrape from loopback, so `/metrics` gained
+`METRICS_ALLOW_NETWORKS`: CIDRs, set by compose to its own fixed bridge subnet. `0.0.0.0/0` and
+a CIDR with host bits set are configuration errors, and the Prometheus config is switched per
+mode so the same gateway is never scraped twice.
+
+### The soak test, and what it found before it measured anything
+
+`bench/soak.py` runs `warden serve` as a subprocess against Postgres and Redis and samples the
+RSS of its whole process tree - the gateway *and* its stdio upstreams, since a session leak
+could live in either. A per-hour memory slope is only reported when the samples span at least
+ten minutes; the first smoke run printed "-9388 MiB/hour" from 45 seconds of data, which is
+noise multiplied by eighty and is now suppressed rather than published.
+
+The smoke run also reported exactly 10% "unexpected outcomes". A per-tool tally traced them to
+`files__list_files {}`: the tool declares `path` optional with default `"."`, the policy
+constrains `path`, and a constraint on an absent argument denies. Fail-closed is the right
+default - the gateway cannot know what an upstream does with a missing value - but it makes a
+schema-conforming call a false positive that the red-team suite never saw, because every
+benign case passes a path. The fix (fill the default from the *pinned* schema, check it, and
+forward exactly what was checked) changes request-path semantics, so per hard rule 10 it is
+recorded as a known gap rather than slipped into the release; the soak passes the path
+explicitly and says why.
+
+### The threat model checks its own citations
+
+Every mitigation in the STRIDE tables cites `path::test_name`, and
+`test_threat_model_links.py` fails if a cited test does not exist. Writing the tables turned up
+one claim with no test behind it - DNS-rebinding protection on `/mcp` - which now has three:
+a foreign `Host` is 421, a foreign `Origin` is 403, and the gateway's own host gets past both.
+The first draft of those tests accepted 400 as a refusal, which an *unprotected* gateway also
+returns (no session yet), so they would have passed with the protection off; they now require
+the exact codes.
+
+### Results are generated, and the check is a test
+
+`make readme-results` renders the README and CHANGELOG results blocks from the newest file of
+each kind in `results/`, deterministically (no clock in the output). A unit test regenerates
+the block and fails if the committed one differs, so a hand-edited number or a forgotten
+regeneration cannot ship.
+
+### What the 30-minute soak measured, and how it is reported
+
+The run is in `results/soak-2026-11-14.md`. Its memory did not grow in a line: it stepped up
+over the first nine minutes and then stayed flat for twenty, and p50 latency settled by minute
+seven in the same way. A least-squares slope through the whole run reports that warm-up step
+as a trend. Rather than replace that figure with a kinder one - which would be choosing the
+method after seeing the data - the report now carries both: the whole-run slope, and the slope
+over the second half only, where a leak would keep growing once warm-up is over. The second
+figure was added to the script and recomputed from the stored per-window samples with
+`python -m bench.soak --rerender`; nothing was re-measured or edited by hand. Thirty minutes
+cannot rule out a leak slower than the window can see, and the report does not claim to.

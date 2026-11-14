@@ -124,8 +124,8 @@ async def test_the_evidence_never_reproduces_hidden_characters(tmp_path: Path) -
     with evil_gateway(tmp_path) as gateway:
         pin = pin_diff(gateway, "evil__get_weather")
     serialised = json.dumps(pin["scan"]["findings"])
-    assert "​" not in serialised
-    assert "‮" not in serialised
+    assert "\u200b" not in serialised
+    assert "\u202e" not in serialised
     assert "U+200B" in serialised or "U+FEFF" in serialised
 
 

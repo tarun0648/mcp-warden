@@ -1,12 +1,62 @@
-# Backing services for mcp-warden. `make up` starts these; `make down` stops them.
+# mcp-warden's stack.
+#
+#   make up        postgres, redis, jaeger - for a gateway run on the host with `make run`
+#   make up-all    everything, including the gateway itself in a container (profile "gateway")
+#
+# Every published port is bound to 127.0.0.1. Redis has no password and Postgres has a dev
+# one; publishing either on 0.0.0.0 would hand them to anyone on the same Wi-Fi.
+#
+# The gateway's stdio upstreams (notes_db, files) run as subprocesses inside the gateway
+# container, exactly as they do on a laptop: servers.yaml is the same file in both places.
 services:
+  gateway:
+    profiles: ["gateway"]
+    build:
+      context: .
+      args:
+        WITH_ML: ${WITH_ML:-false}
+    image: mcp-warden:local
+    # Defence in depth for the one container that handles untrusted input: no writable root,
+    # no Linux capabilities, no privilege escalation through setuid binaries.
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-warden}:${POSTGRES_PASSWORD:-warden_dev_password_change_me}@postgres:5432/${POSTGRES_DB:-warden}
+      REDIS_URL: redis://redis:6379/0
+      WARDEN_RESOURCE_URL: http://localhost:8080/mcp
+      JWT_ISSUER: http://localhost:8080
+      JWT_AUDIENCE: http://localhost:8080/mcp
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      OTEL_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      # Prometheus scrapes from this network, not from loopback. Nothing else is on it.
+      METRICS_ALLOW_NETWORKS: ${WARDEN_DOCKER_SUBNET:-172.28.0.0/24}
+      CLASSIFIER_ENABLED: ${CLASSIFIER_ENABLED:-false}
+    # Published on the host's loopback only. Putting the gateway on a public interface is a
+    # deliberate act; see docs/clients.md.
+    ports: ["127.0.0.1:8080:8080"]
+    volumes:
+      - warden_keys:/var/lib/warden/keys
+      - warden_data:/var/lib/warden/data
+      - warden_sandbox:/var/lib/warden/sandbox
+      - warden_hf:/var/lib/warden/hf
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-warden}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-warden_dev_password_change_me}
       POSTGRES_DB: ${POSTGRES_DB:-warden}
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"]
     volumes: ["warden_pgdata:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-warden} -d ${POSTGRES_DB:-warden}"]
@@ -17,7 +67,7 @@ services:
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "no", "--save", ""]
-    ports: ["6379:6379"]
+    ports: ["127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"]
     volumes: ["warden_redisdata:/data"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -29,7 +79,7 @@ services:
     image: jaegertracing/all-in-one:1.76.0
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
-    ports: ["16686:16686", "4317:4317", "4318:4318"]
+    ports: ["127.0.0.1:16686:16686", "127.0.0.1:4317:4317", "127.0.0.1:4318:4318"]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:14269/"]
       interval: 5s
@@ -39,9 +89,12 @@ services:
   prometheus:
     image: prom/prometheus:v3.1.0
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
+      # prometheus.yml scrapes a gateway on the host; `make up-all` switches to
+      # prometheus.container.yml, which scrapes the gateway container. Never both, or every
+      # series would be counted twice.
+      - --config.file=/etc/prometheus/${PROMETHEUS_CONFIG:-prometheus.yml}
       - --storage.tsdb.retention.time=7d
-    ports: ["9090:9090"]
+    ports: ["127.0.0.1:9090:9090"]
     volumes:
       - ./deploy/prometheus:/etc/prometheus:ro
       - warden_promdata:/prometheus
@@ -63,7 +116,7 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       GF_USERS_DEFAULT_THEME: light
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on:
       prometheus:
         condition: service_healthy
@@ -77,7 +130,19 @@ services:
       timeout: 3s
       retries: 20
 
+# A fixed subnet, so the gateway can be told exactly which network may scrape /metrics.
+# Override WARDEN_DOCKER_SUBNET if it collides with a network on your machine.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${WARDEN_DOCKER_SUBNET:-172.28.0.0/24}
+
 volumes:
+  warden_keys:
+  warden_data:
+  warden_sandbox:
+  warden_hf:
   warden_pgdata:
   warden_redisdata:
   warden_promdata:

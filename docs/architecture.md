@@ -26,7 +26,8 @@ gateway's upstream liveness probe is `tools/list`, not `ping`. Pinging a modern 
 
 | Component | File | Job |
 | --- | --- | --- |
-| App factory | `src/warden/main.py` | Builds the Starlette app: `/mcp`, `/healthz`, `/readyz`, and later the JWKS document, admin API and approval UI |
+| App factory | `src/warden/main.py` | Builds the Starlette app: `/mcp`, `/healthz`, `/readyz`, the JWKS and RFC 9728 metadata documents, `/metrics`, the admin API and the approval UI |
+| HTTP edge | `src/warden/http_limits.py` | Request body limit (413) and JSON-RPC batch refusal, before anything parses the body |
 | MCP server | `src/warden/proxy/server.py` | The low-level `Server` with `on_list_tools` / `on_call_tool`; turns MCP requests into pipeline runs |
 | Pipeline | `src/warden/pipeline.py` | `RequestContext`, the `Stage` protocol, and the runner that orders stages, times them and always runs the finish hooks |
 | Registry | `src/warden/proxy/registry.py` | The namespaced tool map, rebuilt whenever an upstream's listing changes |
@@ -36,7 +37,8 @@ gateway's upstream liveness probe is `tools/list`, not `ping`. Pinging a modern 
 ## Request flow: `tools/call`
 
 ```
-client --POST /mcp--> Streamable HTTP session manager --> on_call_tool
+client --POST /mcp--> request id -> body/batch limits -> auth middleware
+                  --> Streamable HTTP session manager (Host/Origin checks) --> on_call_tool
                                                              |
                                                       RequestContext
                                                              |
@@ -50,7 +52,9 @@ client <-- CallToolResult, or isError with a WARDEN_* reason code
 
 Stages added per phase: `resolve` and `forward` in Phase 3; `authenticate` in 4; `policy` in 5;
 `ratelimit` in 6; the audit finish hook and write-ahead in 7; `definitions`, `dlp` and
-`output_scan` in 8; `approval` in 9.
+`output_scan` in 8; `approval` in 9. Phase 13 added the HTTP-edge limits in front of the
+transport; they are middleware rather than stages because they must run before the body is
+parsed, and a stage only ever sees a parsed request.
 
 Two properties hold at every phase:
 
@@ -149,7 +153,9 @@ line can be followed into its trace.
 
 `/metrics` in Prometheus text format. Served to loopback without a credential — that is how a
 sidecar Prometheus scrapes it — and to the `admin` role otherwise; `METRICS_ALLOW_LOCALHOST=false`
-requires the credential from everywhere. The endpoint is on the auth middleware's *optional*
+requires the credential from everywhere. `METRICS_ALLOW_NETWORKS` adds named CIDRs - compose
+sets its own bridge subnet, because a Prometheus *container* does not scrape from loopback.
+The endpoint is on the auth middleware's *optional*
 list: a credential is verified if present and not required, so the endpoint itself can make
 that choice.
 
@@ -170,3 +176,23 @@ per-caller usage already lives in the audit log and `/admin/usage`.
 
 `make up-observability` starts Prometheus (`:9090`) and Grafana (`:3000`) with the datasource
 and the `mcp-warden` dashboard provisioned from `deploy/grafana/`.
+
+## Deployment
+
+`make up-all` runs the whole stack in containers: the gateway (its stdio upstreams are child
+processes inside the same container, launched by the same `servers.yaml` as on a laptop),
+Postgres, Redis, Jaeger, Prometheus and Grafana.
+
+| Concern | How |
+| --- | --- |
+| Image | two stages; base images pinned by tag and digest; `uv sync --frozen`; `WITH_ML` build arg |
+| Privileges | uid 10001, no login shell, `cap_drop: [ALL]`, `no-new-privileges` |
+| Filesystem | `read_only: true`; `/tmp` is a tmpfs; keys, notes database, sandbox and model cache are named volumes under `/var/lib/warden` |
+| Startup | the entrypoint runs `warden db upgrade` and `warden keys init-jwt` (both idempotent), then `serve` |
+| Network | every port published on 127.0.0.1 only; a fixed bridge subnet so `/metrics` can name its scraper |
+| Health | the image's healthcheck is `/healthz` (liveness); `/readyz` checks Postgres and Redis |
+
+Liveness says nothing about upstreams. The first containerised run was healthy with both
+upstreams down (see the Phase 13 entry in `docs/decisions.md`); `warden tools list` or an
+actual MCP session is the check that the gateway can do its job.
+

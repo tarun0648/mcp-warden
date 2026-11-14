@@ -305,3 +305,68 @@ def test_device_resolution_prefers_an_explicit_choice() -> None:
     assert InjectionClassifier(device="cpu")._resolve_device() == "cpu"
     assert InjectionClassifier(device="mps")._resolve_device() == "mps"
     assert InjectionClassifier(device="auto")._resolve_device() in ("cpu", "mps")
+
+
+# -- supply chain: what is loaded, and from which commit -----------------------------------------
+
+
+def test_the_default_revision_is_a_full_commit_hash() -> None:
+    """A branch name like "main" would defeat the pin: it moves when the repository does."""
+    import re
+
+    from warden.scan.classifier import DEFAULT_REVISION
+
+    assert re.fullmatch(r"[0-9a-f]{40}", DEFAULT_REVISION)
+
+
+def test_the_config_default_matches_the_classifier_default() -> None:
+    from warden.config import ScanConfig
+    from warden.scan.classifier import DEFAULT_REVISION
+
+    assert ScanConfig().classifier_revision == DEFAULT_REVISION
+
+
+@pytest.mark.parametrize(
+    "revision", ["main", "v2", "90c9989", "90C9989B1A342275DD0D1A95AAD283C04E075671"]
+)
+def test_a_mutable_or_abbreviated_revision_is_a_config_error(revision: str) -> None:
+    from pydantic import ValidationError
+
+    from warden.config import ScanConfig
+
+    with pytest.raises(ValidationError):
+        ScanConfig(classifier_revision=revision)
+
+
+def test_loading_pins_the_revision_and_refuses_pickle_weights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The classifier's own loading code is under test; the Hugging Face loaders are not.
+
+    They are replaced by recorders so the test can see exactly what the gateway asks for,
+    without a network or a 700 MB download.
+    """
+    transformers = pytest.importorskip("transformers")
+    calls: dict[str, dict[str, Any]] = {}
+
+    def recorder(name: str) -> Any:
+        def from_pretrained(model_id: str, **kwargs: Any) -> object:
+            calls[name] = {"model_id": model_id, **kwargs}
+            return object()
+
+        return from_pretrained
+
+    monkeypatch.setattr(transformers.AutoTokenizer, "from_pretrained", recorder("tokenizer"))
+    monkeypatch.setattr(
+        transformers.AutoModelForSequenceClassification, "from_pretrained", recorder("model")
+    )
+    monkeypatch.setattr(transformers, "pipeline", lambda *a, **k: FakePipeline())
+
+    classifier = InjectionClassifier(
+        enabled=True, model_id="org/model", revision="a" * 40, device="cpu"
+    )
+    classifier._load()
+
+    assert calls["tokenizer"] == {"model_id": "org/model", "revision": "a" * 40}
+    assert calls["model"]["revision"] == "a" * 40
+    assert calls["model"]["use_safetensors"] is True

@@ -141,6 +141,35 @@ async def test_metrics_require_the_admin_role_when_loopback_is_not_allowed(
     assert "warden_requests_total" in allowed.text
 
 
+async def test_an_allowed_scraper_network_can_scrape_without_a_credential(
+    tmp_path: Path,
+) -> None:
+    """How a Prometheus container reaches a gateway container: from its bridge subnet."""
+    with running_gateway(
+        tmp_path,
+        settings_overrides={
+            "metrics_allow_localhost": False,
+            # The test client connects from 127.0.0.1, so naming loopback's network stands in
+            # for naming the compose bridge subnet.
+            "metrics_allow_networks": "127.0.0.0/8",
+        },
+    ) as gateway:
+        assert scrape(gateway).status_code == 200
+
+
+async def test_a_scraper_network_that_does_not_contain_the_client_grants_nothing(
+    tmp_path: Path,
+) -> None:
+    with running_gateway(
+        tmp_path,
+        settings_overrides={
+            "metrics_allow_localhost": False,
+            "metrics_allow_networks": "172.28.0.0/24",
+        },
+    ) as gateway:
+        assert scrape(gateway).status_code == 403
+
+
 async def test_metrics_can_be_switched_off(tmp_path: Path) -> None:
     with running_gateway(tmp_path, settings_overrides={"metrics_enabled": False}) as gateway:
         assert scrape(gateway).status_code == 404

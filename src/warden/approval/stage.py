@@ -109,7 +109,9 @@ class Approval:
         )
 
     async def _create(self, ctx: RequestContext, digest: str, principal_id: str) -> Any | None:
-        assert ctx.tool_name is not None
+        if ctx.tool_name is None:
+            # Unreachable after ResolveTool; raising turns it into WARDEN_DENIED:internal.
+            raise RuntimeError("approval stage reached without a resolved tool")
         try:
             return await self._store.create(
                 principal_id=principal_id,

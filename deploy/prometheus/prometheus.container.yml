@@ -1,0 +1,12 @@
+# Scrapes the containerised gateway started by `make up-all`. The gateway allows an
+# unauthenticated scrape only from the compose network (METRICS_ALLOW_NETWORKS).
+global:
+  scrape_interval: 5s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: mcp-warden
+    static_configs:
+      - targets: ["gateway:8080"]
+        labels:
+          instance: container

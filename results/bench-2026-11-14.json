@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T05:21:30.739355+00:00",
+  "generated_at": "2026-11-14T10:32:22.293914+00:00",
   "machine": {
     "platform": "macOS-26.6-arm64-arm-64bit",
     "machine": "arm64",
@@ -27,191 +27,191 @@
       "concurrency": 1,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 0.877,
-      "p95_ms": 1.042,
-      "p99_ms": 1.138,
-      "mean_ms": 0.896,
-      "throughput_per_second": 1113.1,
-      "wall_seconds": 0.898
+      "p50_ms": 0.905,
+      "p95_ms": 1.057,
+      "p99_ms": 1.164,
+      "mean_ms": 0.918,
+      "throughput_per_second": 1086.7,
+      "wall_seconds": 0.92
     },
     {
       "configuration": "direct",
       "concurrency": 10,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 4.304,
+      "p50_ms": 4.432,
       "p95_ms": 4.919,
-      "p99_ms": 8.072,
-      "mean_ms": 4.399,
-      "throughput_per_second": 2222.6,
-      "wall_seconds": 0.45
+      "p99_ms": 8.025,
+      "mean_ms": 4.499,
+      "throughput_per_second": 2169.8,
+      "wall_seconds": 0.461
     },
     {
       "configuration": "direct",
       "concurrency": 50,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 22.665,
-      "p95_ms": 37.633,
-      "p99_ms": 53.301,
-      "mean_ms": 24.684,
-      "throughput_per_second": 1850.4,
-      "wall_seconds": 0.54
+      "p50_ms": 23.103,
+      "p95_ms": 76.999,
+      "p99_ms": 79.091,
+      "mean_ms": 27.257,
+      "throughput_per_second": 1695.4,
+      "wall_seconds": 0.59
     },
     {
       "configuration": "auth+policy",
       "concurrency": 1,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 3.157,
-      "p95_ms": 3.692,
-      "p99_ms": 3.97,
-      "mean_ms": 3.221,
-      "throughput_per_second": 310.2,
-      "wall_seconds": 3.224
+      "p50_ms": 3.185,
+      "p95_ms": 3.573,
+      "p99_ms": 4.055,
+      "mean_ms": 3.233,
+      "throughput_per_second": 309.0,
+      "wall_seconds": 3.236
     },
     {
       "configuration": "auth+policy",
       "concurrency": 10,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 23.084,
-      "p95_ms": 24.981,
-      "p99_ms": 75.987,
-      "mean_ms": 24.224,
-      "throughput_per_second": 406.3,
-      "wall_seconds": 2.461
+      "p50_ms": 23.2,
+      "p95_ms": 25.272,
+      "p99_ms": 75.684,
+      "mean_ms": 23.662,
+      "throughput_per_second": 411.4,
+      "wall_seconds": 2.431
     },
     {
       "configuration": "auth+policy",
       "concurrency": 50,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 125.301,
-      "p95_ms": 205.83,
-      "p99_ms": 266.497,
-      "mean_ms": 134.847,
-      "throughput_per_second": 352.8,
-      "wall_seconds": 2.834
+      "p50_ms": 123.346,
+      "p95_ms": 183.097,
+      "p99_ms": 215.634,
+      "mean_ms": 129.901,
+      "throughput_per_second": 360.6,
+      "wall_seconds": 2.773
     },
     {
       "configuration": "full (rules)",
       "concurrency": 1,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 4.689,
-      "p95_ms": 5.289,
-      "p99_ms": 5.732,
-      "mean_ms": 4.751,
-      "throughput_per_second": 210.4,
-      "wall_seconds": 4.754
+      "p50_ms": 4.731,
+      "p95_ms": 5.717,
+      "p99_ms": 7.424,
+      "mean_ms": 4.871,
+      "throughput_per_second": 205.2,
+      "wall_seconds": 4.874
     },
     {
       "configuration": "full (rules)",
       "concurrency": 10,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 38.644,
-      "p95_ms": 45.723,
-      "p99_ms": 91.255,
-      "mean_ms": 40.308,
-      "throughput_per_second": 246.0,
-      "wall_seconds": 4.064
+      "p50_ms": 37.701,
+      "p95_ms": 44.206,
+      "p99_ms": 92.748,
+      "mean_ms": 39.21,
+      "throughput_per_second": 252.2,
+      "wall_seconds": 3.965
     },
     {
       "configuration": "full (rules)",
       "concurrency": 50,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 197.688,
-      "p95_ms": 269.67,
-      "p99_ms": 339.334,
-      "mean_ms": 205.909,
-      "throughput_per_second": 234.4,
-      "wall_seconds": 4.266
+      "p50_ms": 193.888,
+      "p95_ms": 259.301,
+      "p99_ms": 282.937,
+      "mean_ms": 202.12,
+      "throughput_per_second": 236.4,
+      "wall_seconds": 4.231
     },
     {
       "configuration": "full (classifier)",
       "concurrency": 1,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 40.341,
-      "p95_ms": 41.256,
-      "p99_ms": 42.767,
-      "mean_ms": 40.169,
-      "throughput_per_second": 24.9,
-      "wall_seconds": 40.173
+      "p50_ms": 39.754,
+      "p95_ms": 40.657,
+      "p99_ms": 41.051,
+      "mean_ms": 39.105,
+      "throughput_per_second": 25.6,
+      "wall_seconds": 39.109
     },
     {
       "configuration": "full (classifier)",
       "concurrency": 10,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 364.415,
-      "p95_ms": 392.341,
-      "p99_ms": 479.451,
-      "mean_ms": 366.011,
-      "throughput_per_second": 27.2,
-      "wall_seconds": 36.765
+      "p50_ms": 365.581,
+      "p95_ms": 407.748,
+      "p99_ms": 489.481,
+      "mean_ms": 366.846,
+      "throughput_per_second": 27.1,
+      "wall_seconds": 36.866
     },
     {
       "configuration": "full (classifier)",
       "concurrency": 50,
       "calls": 1000,
       "errors": 0,
-      "p50_ms": 1941.14,
-      "p95_ms": 2023.778,
-      "p99_ms": 2040.152,
-      "mean_ms": 1881.448,
-      "throughput_per_second": 26.0,
-      "wall_seconds": 38.424
+      "p50_ms": 2041.169,
+      "p95_ms": 2113.413,
+      "p99_ms": 2209.252,
+      "mean_ms": 1965.438,
+      "throughput_per_second": 24.6,
+      "wall_seconds": 40.573
     }
   ],
   "overhead": {
     "auth+policy@1": {
       "p50_added_ms": 2.28,
-      "p95_added_ms": 2.65,
-      "p99_added_ms": 2.831
+      "p95_added_ms": 2.516,
+      "p99_added_ms": 2.892
     },
     "auth+policy@10": {
-      "p50_added_ms": 18.78,
-      "p95_added_ms": 20.061,
-      "p99_added_ms": 67.916
+      "p50_added_ms": 18.768,
+      "p95_added_ms": 20.353,
+      "p99_added_ms": 67.659
     },
     "auth+policy@50": {
-      "p50_added_ms": 102.636,
-      "p95_added_ms": 168.197,
-      "p99_added_ms": 213.196
+      "p50_added_ms": 100.243,
+      "p95_added_ms": 106.098,
+      "p99_added_ms": 136.543
     },
     "full (rules)@1": {
-      "p50_added_ms": 3.812,
-      "p95_added_ms": 4.247,
-      "p99_added_ms": 4.593
+      "p50_added_ms": 3.827,
+      "p95_added_ms": 4.66,
+      "p99_added_ms": 6.261
     },
     "full (rules)@10": {
-      "p50_added_ms": 34.34,
-      "p95_added_ms": 40.803,
-      "p99_added_ms": 83.183
+      "p50_added_ms": 33.27,
+      "p95_added_ms": 39.287,
+      "p99_added_ms": 84.723
     },
     "full (rules)@50": {
-      "p50_added_ms": 175.023,
-      "p95_added_ms": 232.037,
-      "p99_added_ms": 286.033
+      "p50_added_ms": 170.786,
+      "p95_added_ms": 182.302,
+      "p99_added_ms": 203.847
     },
     "full (classifier)@1": {
-      "p50_added_ms": 39.464,
-      "p95_added_ms": 40.214,
-      "p99_added_ms": 41.629
+      "p50_added_ms": 38.849,
+      "p95_added_ms": 39.6,
+      "p99_added_ms": 39.888
     },
     "full (classifier)@10": {
-      "p50_added_ms": 360.112,
-      "p95_added_ms": 387.422,
-      "p99_added_ms": 471.38
+      "p50_added_ms": 361.15,
+      "p95_added_ms": 402.829,
+      "p99_added_ms": 481.455
     },
     "full (classifier)@50": {
-      "p50_added_ms": 1918.475,
-      "p95_added_ms": 1986.145,
-      "p99_added_ms": 1986.851
+      "p50_added_ms": 2018.067,
+      "p95_added_ms": 2036.413,
+      "p99_added_ms": 2130.161
     }
   }
 }
