@@ -7,7 +7,7 @@ half-finished.
 
 - `make lint` clean: ruff check, ruff format --check, mypy --strict on `src/warden` and `servers`.
 - `make test`: 1323 passed, unit + integration, against real Postgres and Redis.
-  After the post-release defaults fix: 1352 passed.
+  At v0.1.1, after the defaults fix: 1352 passed.
 - `make test-all`: every layer; the five `e2e` tests skip because Ollama is not installed here.
 - `make cov`: 94.27% on `src/warden` against an 85% gate.
 - `make security`: bandit clean (two justified `nosec`), pip-audit clean.
@@ -32,8 +32,8 @@ Full list in `docs/threat-model.md#known-gaps`. The most actionable: **the gatew
 itself as an OAuth authorization server it is not.** Either delegate to a real one or stop
 naming it in the RFC 9728 metadata.
 
-The absent-argument false positive found by the soak test is fixed since v0.1.0 (see
-`CHANGELOG.md`, Unreleased).
+The absent-argument false positive found by the soak test is fixed in v0.1.1 (see
+`CHANGELOG.md`).
 
 ## Backing services on this machine
 

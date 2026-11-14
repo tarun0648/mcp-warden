@@ -812,6 +812,5 @@ defaults exist - `list_notes.limit = 20` (unconstrained) and `list_files.path = 
 that omit an optional argument were added. A one-minute soak with the mix restored to `{}`
 went from 120 refusals of that call to 120 allowed.
 
-**Release bookkeeping.** v0.1.0 was already tagged, so this is listed under Unreleased in the
-CHANGELOG, and the v0.1.0 section's results block is frozen at the figures it was released
+**Release bookkeeping.** v0.1.0 was already tagged, so this shipped as v0.1.1, and the v0.1.0 section's results block is frozen at the figures it was released
 with; `make readme-results` now regenerates only the README.
