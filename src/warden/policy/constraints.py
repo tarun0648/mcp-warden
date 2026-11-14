@@ -14,7 +14,7 @@ import posixpath
 import re
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import Any, Final
 
 from warden.config import ArgumentConstraint
 
@@ -28,6 +28,11 @@ class ConstraintFailure:
 
     def __str__(self) -> str:
         return f"argument '{self.argument}' {self.problem}"
+
+
+#: Any percent-encoded byte. Mirrors `servers.files.safe_path.PERCENT_ENCODING_RE`; the two
+#: are deliberately the same rule applied at two layers.
+PERCENT_ENCODING_RE: Final = re.compile(r"%[0-9A-Fa-f]{2}")
 
 
 @lru_cache(maxsize=1024)
@@ -89,6 +94,15 @@ def check_argument(
     if constraint.starts_with is not None:
         if not isinstance(value, str):
             return ConstraintFailure(name, "must be a string to be checked as a path")
+        if PERCENT_ENCODING_RE.search(value):
+            # Found by the red-team suite: "%2e%2e/%2e%2e/etc/passwd" normalises to itself, so
+            # a prefix check passes it and only the upstream's own sandbox stops it. The files
+            # server refuses percent-encoding outright, and the gateway now says the same -
+            # decoding is what turns these into traversal, and a path constraint that depends on
+            # the upstream agreeing with it is one layer, not two.
+            return ConstraintFailure(
+                name, "must not contain percent-encoding, which is not accepted in a path"
+            )
         candidate = normalise_path(value)
         prefix = normalise_path(constraint.starts_with)
         if not _path_within(candidate, prefix):
@@ -142,6 +156,7 @@ def check_constraints(
 
 
 __all__ = [
+    "PERCENT_ENCODING_RE",
     "ConstraintFailure",
     "check_argument",
     "check_constraints",

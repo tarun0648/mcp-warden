@@ -69,3 +69,42 @@ jobs:
         with:
           name: coverage
           path: coverage.xml
+
+  redteam:
+    # Rules only: CI has no model weights, and a run that silently fell back to rules while
+    # labelling itself "with classifier" would be worse than not running it.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: warden
+          POSTGRES_PASSWORD: warden_dev_password_change_me
+          POSTGRES_DB: warden
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U warden -d warden"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --all-groups
+      # Exits non-zero on any case error and on any regression against results/baseline.json.
+      - run: uv run python -m redteam.runner --rules-only
+        env:
+          DATABASE_URL: postgresql+asyncpg://warden:warden_dev_password_change_me@localhost:5432/warden
+          REDIS_URL: redis://localhost:6379/0
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: redteam-report
+          path: results/redteam-*.*

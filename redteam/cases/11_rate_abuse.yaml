@@ -1,0 +1,142 @@
+# Rate abuse: spending more than the caller's share.
+cases:
+- id: ra-001-burst-past-the-bucket-is-denied
+  category: rate_abuse
+  attack: true
+  role: reader
+  description: Four calls against a bucket of three. The fourth must be refused rather than queued
+    or served.
+  gateway: &id001
+    limits:
+      default:
+        per_principal:
+          capacity: 3
+          refill_per_second: 0.01
+        per_tool:
+          capacity: 99
+          refill_per_second: 99.0
+        daily_calls: 1000
+        daily_destructive_calls: 1000
+      roles: {}
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: denied
+    reason: WARDEN_DENIED:rate_limit
+- id: ra-002-a-refused-call-is-not-forwarded
+  category: rate_abuse
+  attack: true
+  role: editor
+  description: 'Spending the bucket on reads, then a write: the write is refused, so the upstream
+    never ran and no file appears.'
+  gateway: *id001
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+  - tool: files__write_file
+    args:
+      path: after-limit.md
+      content: x
+    expect: denied
+    reason: WARDEN_DENIED:rate_limit
+- id: ra-003-the-destructive-budget-is-separate
+  category: rate_abuse
+  attack: true
+  role: editor
+  description: A zero destructive budget refuses the first destructive call while ordinary reads keep
+    working, so one abusive pattern cannot spend the whole allowance.
+  gateway:
+    limits:
+      default:
+        per_principal:
+          capacity: 99
+          refill_per_second: 99.0
+        per_tool:
+          capacity: 99
+          refill_per_second: 99.0
+        daily_calls: 99
+        daily_destructive_calls: 0
+      roles: {}
+    approval:
+      wait_seconds: 0.3
+      expiry_seconds: 300.0
+  steps:
+  - tool: notes_db__delete_note
+    args:
+      note_id: 2
+    expect: denied
+    reason: WARDEN_DENIED:budget
+  - tool: notes_db__list_notes
+    args:
+      limit: 1
+    expect: allowed
+- id: ra-004-normal-traffic-is-not-limited
+  category: rate_abuse
+  attack: false
+  role: editor
+  description: Ten ordinary reads under the shipped limits must all succeed. A limiter that throttled
+    normal use would be switched off.
+  steps:
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed

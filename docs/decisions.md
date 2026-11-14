@@ -462,3 +462,84 @@ stronger measurement, and it reports both columns for the same reason.
   dashboard is read-only, carries no secrets, and a login prompt in front of a localhost
   dashboard is friction without security. Noted here so it is a decision rather than an
   oversight.
+
+## Phase 11 — red-team suite and benchmark
+
+### What the measurements say
+
+Red-team, 127 cases (67 attacks across 12 categories, 60 benign), from
+`results/redteam-<date>.md`:
+
+| Configuration | Attacks blocked | False positives |
+| --- | --- | --- |
+| rules only | 67/67 (100%) | 0/60 (0%) |
+| rules + classifier | 67/67 (100%) | 1/60 (1.7%) |
+
+Latency, 1000 calls to `notes_db__get_note` after 50 warm-up calls, Apple M4 / 16 GB, from
+`results/bench-<date>.md`:
+
+| Configuration | p50 | p95 | p95 added over direct |
+| --- | --- | --- | --- |
+| direct upstream | 0.88 ms | 1.04 ms | — |
+| auth + policy | 3.16 ms | 3.69 ms | +2.65 ms |
+| full pipeline, rules | 4.69 ms | 5.29 ms | **+4.25 ms** |
+| full pipeline, classifier | 40.34 ms | 41.26 ms | +40.2 ms |
+
+**The classifier costs about eight times the entire rest of the gateway and adds nothing.** The
+red-team suite reached that conclusion independently of the labelled dataset in Phase 8, by a
+different route, and the latency number puts a price on it: ~36 ms per call for no extra
+detection and one more false positive. That is why it ships switched off, and why it cannot
+decide on its own.
+
+### How the suite is built
+
+- **Cases are data, in YAML.** A case can be added without touching the runner, the whole suite
+  diffs in review, and the report names the exact case that regressed.
+- **A `denied` case must name its reason code**, enforced by the model. A case asserting
+  "denied, somehow" passes when the gateway refuses for the *wrong* reason, which is how a
+  suite quietly stops measuring anything. There is a unit test for that rule.
+- **`upstream_error` is a distinct expectation from `denied`.** "The tool said no" and "the
+  gateway said no" are different facts, and collapsing them would let a gateway take credit for
+  its upstream's input validation. Several SQL-injection cases legitimately expect the former.
+- **`pending` is not counted as blocked.** An approval nobody has decided is not a refusal, and
+  scoring it as one would overstate the block rate.
+- **Cases are grouped by their gateway overrides**, so 127 cases start 13 gateways rather than
+  127. The grouping key includes the evil server's payload variant, because that is baked into
+  the subprocess environment at startup.
+- **Nothing is retried.** A flaky security control is a failing one.
+- **60 benign cases carry the same weight as the attacks.** A gateway that blocks everything
+  scores 100% on the attack suite, so the benign half is what makes the number mean anything -
+  including eight cases whose content is deliberately full of the words the scanners look for.
+- **The runner imports the gateway harness from `tests.helpers`** rather than keeping a second
+  copy, which would drift from the one the test suite exercises.
+- **CI runs the suite rules-only on every push** and exits non-zero on any case error or any
+  regression against `results/baseline.json`, in *either* direction: a block rate that falls or
+  a false-positive rate that rises both fail.
+
+### Three real findings from running it
+
+- **Percent-encoded traversal reached the upstream.** `%2e%2e/%2e%2e/etc/passwd` normalises to
+  itself, so the policy's `starts_with` check passed it and only the files server's own sandbox
+  refused it. The policy constraint now rejects percent-encoding exactly as the files server
+  does - the same rule at two layers, which is what defence in depth is supposed to mean.
+- **The benchmark was being rate-limited by the gateway it was measuring.** A thousand calls as
+  one caller spends the shipped per-tool bucket after the first second, and every call after
+  that returned a denial in well under a millisecond - which would have reported the full
+  pipeline as *faster* than the cut-down one. The benchmark now raises the capacity while
+  leaving the stage in the pipeline, so its cost is still measured.
+- **The benchmark measured the SDK's session, not the gateway.** Fifty concurrent calls
+  multiplexed onto one Streamable HTTP session serialise behind a single response stream, and
+  the slowest calls timed out. It now uses one session per concurrent worker, which is both what
+  a real deployment looks like and what makes the concurrency numbers mean anything. Each
+  measurement also gets a fresh gateway, so a sequential p50 is not quietly benefiting from
+  pools that fifty clients warmed a moment earlier.
+
+### Two case expectations that were wrong, not the gateway
+
+- `sh-004` asked the approved impostor to read `/etc/passwd`, so its *reply* named that path and
+  the output scanner blocked it - correct behaviour for an untrusted server. The case now uses an
+  innocuous path, and a new `sh-005` asserts the blocking as an attack in its own right.
+- `af-900` expected HTTP 200 from a genuine token on a bare `tools/list` POST. It gets 400: the
+  credential is accepted and the MCP layer then refuses the request for not being an initialised
+  session. 400 rather than 401 *is* the proof that authentication passed, and the case now says
+  so.

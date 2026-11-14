@@ -1,0 +1,228 @@
+# Constraint bypass: satisfying a tool's own schema while violating the policy's intent.
+cases:
+- id: cb-001-path-traversal-in-a-write
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: '''../escaped.md'' is a valid string that leaves the sandbox. The gateway''s own starts_with
+    constraint normalises the path and refuses it before the files server is reached.'
+  steps:
+  - tool: files__write_file
+    args:
+      path: ../escaped.md
+      content: pwned
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-002-path-traversal-in-a-read
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: Reading outside the sandbox root.
+  steps:
+  - tool: files__read_file
+    args:
+      path: ../../etc/passwd
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-003-traversal-disguised-by-a-subdirectory
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: '''notes/../../etc/passwd'' looks like it starts inside notes/. The constraint compares
+    the normalised path, so it does not.'
+  steps:
+  - tool: files__read_file
+    args:
+      path: notes/../../etc/passwd
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-004-absolute-path
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: An absolute path, which no relative prefix can match.
+  steps:
+  - tool: files__read_file
+    args:
+      path: /etc/passwd
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-005-traversal-in-a-delete
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: The same trick aimed at the destructive tool.
+  steps:
+  - tool: files__delete_file
+    args:
+      path: ../../important.txt
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-006-percent-encoded-traversal
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: Percent-encoded dots, which would become traversal if anything decoded them.
+  steps:
+  - tool: files__read_file
+    args:
+      path: '%2e%2e/%2e%2e/etc/passwd'
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-007-sql-write-through-the-gateway
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: run_sql is described as read-only. A DROP is refused by the notes server's own guard,
+    which answers as the tool rather than as the gateway - so this asserts upstream_error, not a warden
+    denial.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: DROP TABLE notes
+    expect: upstream_error
+- id: cb-008-sql-write-hidden-in-a-cte
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: A data-modifying statement wrapped in a WITH clause.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: WITH x AS (DELETE FROM notes RETURNING id) SELECT * FROM x
+    expect: upstream_error
+- id: cb-009-two-sql-statements
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: A second statement smuggled after a harmless SELECT.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT 1; DROP TABLE notes
+    expect: upstream_error
+- id: cb-010-sql-attach-another-database
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: ATTACH would let a read-only SELECT read a file outside the notes database entirely.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: ATTACH DATABASE '/etc/passwd' AS leak
+    expect: upstream_error
+- id: cb-011-oversized-sql-refused-by-the-constraint
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: The policy caps the query length, so an enormous query is refused by the gateway rather
+    than handed to SQLite to parse.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-012-oversized-note-title-refused
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: An argument constraint caps the title length. A tool whose own schema is looser must
+    still obey the policy.
+  steps:
+  - tool: notes_db__create_note
+    args:
+      title: TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+      body: b
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-013-note-id-below-the-minimum
+  category: constraint_bypass
+  attack: true
+  role: editor
+  description: A numeric constraint with a minimum. Zero and negative ids are the probing values.
+  steps:
+  - tool: notes_db__delete_note
+    args:
+      note_id: 0
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: cb-014-ordinary-relative-paths-still-work
+  category: constraint_bypass
+  attack: false
+  role: editor
+  description: The false-positive partner. A path constraint that refused ordinary nested paths would
+    make the files server unusable.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/deep/nested/file.md
+      content: fine
+    expect: allowed
+  - tool: files__read_file
+    args:
+      path: notes/deep/nested/file.md
+    expect: allowed
+- id: cb-015-a-normal-select-still-works
+  category: constraint_bypass
+  attack: false
+  role: editor
+  description: Read-only SQL is the point of the tool and must keep working.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT COUNT(*) AS n FROM notes
+    expect: allowed
+- id: cb-016-a-path-containing-dots-is-not-traversal
+  category: constraint_bypass
+  attack: false
+  role: editor
+  description: A file called release.v1.2.md contains dots but climbs nowhere. Refusing it would be
+    the over-eager version of the traversal check.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/release.v1.2.md
+      content: notes
+    expect: allowed
+- id: cb-017-a-read-only-cte-is-allowed
+  category: constraint_bypass
+  attack: false
+  role: editor
+  description: A WITH clause is not inherently a write. Blocking every CTE would be the lazy version
+    of the SQL guard.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: WITH recent AS (SELECT id FROM notes WHERE id > 5) SELECT COUNT(*) AS n FROM recent
+    expect: allowed

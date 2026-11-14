@@ -1,0 +1,134 @@
+# Approval bypass: getting a destructive call through without a human deciding.
+cases:
+- id: ab-001-destructive-call-waits-for-a-human
+  category: approval_bypass
+  attack: true
+  role: editor
+  description: A delete must not go through on the caller's word alone. With nobody to approve it
+    the call comes back pending, and the file is still there.
+  gateway: &id001
+    approval:
+      wait_seconds: 0.3
+      expiry_seconds: 300.0
+  setup:
+  - tool: files__write_file
+    args:
+      path: doomed.md
+      content: x
+  steps:
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+- id: ab-002-note-delete-also-waits
+  category: approval_bypass
+  attack: true
+  role: editor
+  description: The same for the notes server's destructive tool, so the control is about risk and
+    not about one upstream.
+  gateway: *id001
+  steps:
+  - tool: notes_db__delete_note
+    args:
+      note_id: 3
+    expect: pending
+    reason: WARDEN_PENDING:approval
+- id: ab-003-retrying-does-not-wear-down-the-control
+  category: approval_bypass
+  attack: true
+  role: editor
+  description: Five retries of the same undecided call stay pending. A control that gave way under
+    repetition would be no control.
+  gateway: *id001
+  setup:
+  - tool: files__write_file
+    args:
+      path: doomed.md
+      content: x
+  steps:
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+- id: ab-004-changing-the-argument-does-not-inherit-an-approval
+  category: approval_bypass
+  attack: true
+  role: editor
+  description: An approval is bound to the argument hash, so asking about a different file needs its
+    own approval rather than riding the first one.
+  gateway: *id001
+  setup:
+  - tool: files__write_file
+    args:
+      path: keep.md
+      content: x
+  - tool: files__write_file
+    args:
+      path: doomed.md
+      content: x
+  steps:
+  - tool: files__delete_file
+    args:
+      path: doomed.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+  - tool: files__delete_file
+    args:
+      path: keep.md
+    expect: pending
+    reason: WARDEN_PENDING:approval
+- id: ab-005-a-write-does-not-need-approval
+  category: approval_bypass
+  attack: false
+  role: editor
+  description: Only destructive tools stop for a human. An approval queue that filled up with ordinary
+    writes would be ignored within a day.
+  gateway: *id001
+  steps:
+  - tool: files__write_file
+    args:
+      path: ordinary.md
+      content: fine
+    expect: allowed
+  - tool: notes_db__create_note
+    args:
+      title: T
+      body: B
+    expect: allowed
+- id: ab-006-reads-are-untouched-by-the-approval-stage
+  category: approval_bypass
+  attack: false
+  role: editor
+  description: Reads must not be slowed down or queued by a control aimed at deletes.
+  gateway: *id001
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 3
+    expect: allowed
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed

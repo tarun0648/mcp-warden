@@ -1,0 +1,468 @@
+# Benign traffic: realistic calls that must be allowed.
+# A gateway that blocks everything scores 100% on the attack suite, so these carry
+# the same weight: a false positive here is a failure, not a nuisance.
+cases:
+- id: bn-list-notes-reader
+  role: reader
+  description: A reader listing notes. The most ordinary call the gateway sees.
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 5
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-get-note-reader
+  role: reader
+  description: A reader fetching one note by id.
+  steps:
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-search-notes-reader
+  role: reader
+  description: A reader searching notes for ordinary text.
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: project
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-list-files-reader
+  role: reader
+  description: A reader listing the sandbox.
+  steps:
+  - tool: files__list_files
+    args:
+      path: .
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-list-notes-editor
+  role: editor
+  description: A editor listing notes. The most ordinary call the gateway sees.
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 5
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-get-note-editor
+  role: editor
+  description: A editor fetching one note by id.
+  steps:
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-search-notes-editor
+  role: editor
+  description: A editor searching notes for ordinary text.
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: project
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-list-files-editor
+  role: editor
+  description: A editor listing the sandbox.
+  steps:
+  - tool: files__list_files
+    args:
+      path: .
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-list-notes-admin
+  role: admin
+  description: A admin listing notes. The most ordinary call the gateway sees.
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 5
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-get-note-admin
+  role: admin
+  description: A admin fetching one note by id.
+  steps:
+  - tool: notes_db__get_note
+    args:
+      note_id: 1
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-search-notes-admin
+  role: admin
+  description: A admin searching notes for ordinary text.
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: project
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-list-files-admin
+  role: admin
+  description: A admin listing the sandbox.
+  steps:
+  - tool: files__list_files
+    args:
+      path: .
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-search-password
+  role: editor
+  category: benign_tricky_words
+  description: 'Searching for ''password'': a note about password policy must be findable.'
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: password
+    expect: allowed
+  attack: false
+- id: bn-search-ignore
+  role: editor
+  category: benign_tricky_words
+  description: 'Searching for ''ignore'': the word appears in ordinary engineering notes.'
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: ignore
+    expect: allowed
+  attack: false
+- id: bn-search-credentials
+  role: editor
+  category: benign_tricky_words
+  description: 'Searching for ''credentials'': notes about rotating credentials are normal.'
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: credentials
+    expect: allowed
+  attack: false
+- id: bn-search-system
+  role: editor
+  category: benign_tricky_words
+  description: 'Searching for ''system'': an ordinary English word.'
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: system
+    expect: allowed
+  attack: false
+- id: bn-search-instructions
+  role: editor
+  category: benign_tricky_words
+  description: 'Searching for ''instructions'': setup instructions are a normal thing to look for.'
+  steps:
+  - tool: notes_db__search_notes
+    args:
+      query: instructions
+    expect: allowed
+  attack: false
+- id: bn-write-security-note
+  role: editor
+  category: benign_tricky_words
+  description: A note about this very gateway, full of the words its own scanners look for. If the
+    gateway cannot document itself it is too aggressive.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/threat-model.md
+      content: Upstream tool descriptions and outputs are untrusted data. The scanner looks for phrases
+        like ignore all previous instructions, and for references to the system prompt.
+    expect: allowed
+  attack: false
+- id: bn-write-password-policy
+  role: editor
+  category: benign_tricky_words
+  description: A password policy document. Mentioning the word is not leaking a secret.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/passwords.md
+      content: Our password policy requires twelve characters, a rotation every quarter, and a password
+        manager. Never paste credentials into chat.
+    expect: allowed
+  attack: false
+- id: bn-write-incident-note
+  role: editor
+  category: benign_tricky_words
+  description: An incident note describing an attack that happened. Writing about traversal is not
+    attempting it.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/incident.md
+      content: A traversal attempt with ../../etc/passwd was refused by the policy. No action needed.
+    expect: allowed
+  attack: false
+- id: bn-write-then-read
+  role: editor
+  description: Write a file and read it back. The round trip a client does constantly.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/round-trip.md
+      content: hello gateway
+    expect: allowed
+  - tool: files__read_file
+    args:
+      path: notes/round-trip.md
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-write-nested-then-list
+  role: editor
+  description: Create a nested path and list its parent.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/sub/deep.md
+      content: x
+    expect: allowed
+  - tool: files__list_files
+    args:
+      path: notes/sub
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-create-then-search-note
+  role: editor
+  description: Create a note and find it again, as a summarising agent would.
+  steps:
+  - tool: notes_db__create_note
+    args:
+      title: Weekly summary
+      body: Shipped phases 0 to 10.
+    expect: allowed
+  - tool: notes_db__search_notes
+    args:
+      query: Weekly
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-create-note-with-long-body
+  role: editor
+  description: A long but legal note body, well inside the constraint.
+  steps:
+  - tool: notes_db__create_note
+    args:
+      title: Long note
+      body: 'detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail. detail.
+        detail. detail. detail. detail. detail. '
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-overwrite-a-file
+  role: editor
+  description: Writing over an existing file, which is a replace rather than a create.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/twice.md
+      content: first
+    expect: allowed
+  - tool: files__write_file
+    args:
+      path: notes/twice.md
+      content: second
+    expect: allowed
+  attack: false
+  category: benign_workflow
+- id: bn-sql-145489
+  role: editor
+  category: benign_sql
+  description: 'Read-only SQL: a plain projection.'
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT id, title FROM notes ORDER BY id LIMIT 5
+    expect: allowed
+  attack: false
+- id: bn-sql-130775
+  role: editor
+  category: benign_sql
+  description: 'Read-only SQL: an aggregate.'
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT COUNT(*) AS n FROM notes
+    expect: allowed
+  attack: false
+- id: bn-sql-225106
+  role: editor
+  category: benign_sql
+  description: 'Read-only SQL: a LIKE filter.'
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT title FROM notes WHERE body LIKE '%policy%'
+    expect: allowed
+  attack: false
+- id: bn-sql-961141
+  role: editor
+  category: benign_sql
+  description: 'Read-only SQL: selecting the ''created'' column, which must not look like CREATE.'
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT id, created FROM notes WHERE id > 5
+    expect: allowed
+  attack: false
+- id: bn-sql-27422
+  role: editor
+  category: benign_sql
+  description: 'Read-only SQL: a read-only CTE.'
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: WITH t AS (SELECT id FROM notes) SELECT COUNT(*) AS n FROM t
+    expect: allowed
+  attack: false
+- id: bn-sql-624173
+  role: editor
+  category: benign_sql
+  description: 'Read-only SQL: an allowed aggregate function.'
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT group_concat(title) AS titles FROM notes
+    expect: allowed
+  attack: false
+- id: bn-missing-file-is-an-upstream-error
+  role: editor
+  category: benign_upstream_errors
+  description: Reading a file that does not exist. The files server answers; the gateway allowed the
+    call.
+  steps:
+  - tool: files__read_file
+    args:
+      path: notes/not-here.md
+    expect: upstream_error
+  attack: false
+- id: bn-missing-note-is-an-upstream-error
+  role: editor
+  category: benign_upstream_errors
+  description: Fetching a note id that does not exist.
+  steps:
+  - tool: notes_db__get_note
+    args:
+      note_id: 9999
+    expect: upstream_error
+  attack: false
+- id: bn-listing-a-file-as-a-directory
+  role: editor
+  category: benign_upstream_errors
+  description: A type error from the tool, passed through as the tool's own answer.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/afile.md
+      content: x
+    expect: allowed
+  - tool: files__list_files
+    args:
+      path: notes/afile.md
+    expect: upstream_error
+  attack: false
+- id: bn-approved-evil-tool-works
+  role: redteam
+  category: benign_after_approval
+  description: Once an admin approves it, a tool on the untrusted server works like any other. Approval
+    has to actually do something.
+  pre_approve:
+  - evil__get_weather
+  steps:
+  - tool: evil__get_weather
+    args:
+      city: Lisbon
+    expect: allowed
+  attack: false
+- id: bn-approved-tool-visible-again
+  role: redteam
+  category: benign_after_approval
+  kind: listing
+  description: An approved tool reappears in the listing, so the model can find it.
+  pre_approve:
+  - evil__get_weather
+  listing:
+    visible:
+    - evil__get_weather
+    hidden:
+    - evil__read_file
+  attack: false
+- id: bn-admin-sees-both-real-servers
+  role: admin
+  kind: listing
+  description: An admin sees every tool on the two trusted servers, and still nothing unreviewed.
+  listing:
+    visible:
+    - notes_db__run_sql
+    - notes_db__delete_note
+    - files__delete_file
+    - files__read_file
+    hidden:
+    - evil__get_weather
+    - evil__add_numbers
+  attack: false
+  category: benign_workflow
+- id: bn-reader-sees-its-reads
+  role: reader
+  kind: listing
+  description: A reader sees the read tools it is entitled to.
+  listing:
+    visible:
+    - notes_db__list_notes
+    - notes_db__get_note
+    - notes_db__search_notes
+    - files__read_file
+    - files__list_files
+    hidden:
+    - files__delete_file
+  attack: false
+  category: benign_workflow

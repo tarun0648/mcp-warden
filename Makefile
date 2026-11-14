@@ -57,8 +57,11 @@ run: ## Run the gateway on $$WARDEN_PORT (default 8080)
 inspector: ## Launch the MCP Inspector against the running gateway
 	npx @modelcontextprotocol/inspector
 
-redteam: ## Run the red-team suite and write results/
+redteam: ## Run the red-team suite (both configurations) and write results/
 	$(RUN) python -m redteam.runner
+
+redteam-rules: ## Run the red-team suite rules-only, as CI does
+	$(RUN) python -m redteam.runner --rules-only
 
 bench: ## Run the latency benchmark and write results/
 	$(RUN) python -m bench.latency

@@ -24,7 +24,7 @@ the policy store, the limiter, the audit log or a scanner is unavailable, the ca
 | 8 | Definition pinning, rug-pull quarantine, DLP, injection scanning | done |
 | 9 | Single-use human approvals with a web UI | done |
 | 10 | OpenTelemetry traces, Prometheus metrics, Grafana | done |
-| 11 | Red-team suite and latency benchmark | not started |
+| 11 | Red-team suite and latency benchmark | done |
 | 12 | Local Ollama demo agent and attack scenarios | not started |
 | 13 | Hardening, threat model, docs, v0.1.0 | not started |
 

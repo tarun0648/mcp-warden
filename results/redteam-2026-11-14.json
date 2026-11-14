@@ -1,0 +1,3222 @@
+{
+  "generated_at": "2026-11-14T05:02:03.874078+00:00",
+  "machine": {
+    "platform": "macOS-26.6-arm64-arm-64bit",
+    "machine": "arm64",
+    "processor": "arm",
+    "python": "3.12.13",
+    "cpu_count": 10,
+    "chip": "Apple M4",
+    "memory_gb": 16.0,
+    "packages": {
+      "mcp": "2.3.0",
+      "mcp_types": "2.3.0",
+      "pydantic": "2.14.3",
+      "sqlalchemy": "2.1.8",
+      "redis": "8.1.0",
+      "transformers": "5.22.2",
+      "torch": "2.15.0"
+    }
+  },
+  "runs": [
+    {
+      "label": "rules only",
+      "attacks": 67,
+      "blocked": 67,
+      "block_rate": 1.0,
+      "benign": 60,
+      "benign_allowed": 60,
+      "false_positive_rate": 0.0,
+      "errors": 0,
+      "categories": [
+        {
+          "category": "approval_bypass",
+          "attacks": 4,
+          "blocked": 4,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "auth_forgery",
+          "attacks": 14,
+          "blocked": 14,
+          "block_rate": 1.0,
+          "benign": 1,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "benign_after_approval",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "benign_sql",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 6,
+          "benign_allowed": 6,
+          "errors": 0
+        },
+        {
+          "category": "benign_tricky_words",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 8,
+          "benign_allowed": 8,
+          "errors": 0
+        },
+        {
+          "category": "benign_upstream_errors",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 3,
+          "benign_allowed": 3,
+          "errors": 0
+        },
+        {
+          "category": "benign_workflow",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 19,
+          "benign_allowed": 19,
+          "errors": 0
+        },
+        {
+          "category": "constraint_bypass",
+          "attacks": 13,
+          "blocked": 13,
+          "block_rate": 1.0,
+          "benign": 4,
+          "benign_allowed": 4,
+          "errors": 0
+        },
+        {
+          "category": "dlp_exfiltration",
+          "attacks": 7,
+          "blocked": 7,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "encoded_injection",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 1,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "indirect_injection",
+          "attacks": 2,
+          "blocked": 2,
+          "block_rate": 1.0,
+          "benign": 3,
+          "benign_allowed": 3,
+          "errors": 0
+        },
+        {
+          "category": "privilege_escalation",
+          "attacks": 9,
+          "blocked": 9,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "rate_abuse",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 1,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "resource_abuse",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "rug_pull",
+          "attacks": 1,
+          "blocked": 1,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "shadowing",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "tool_poisoning",
+          "attacks": 5,
+          "blocked": 5,
+          "block_rate": 1.0,
+          "benign": 0,
+          "benign_allowed": 0,
+          "errors": 0
+        }
+      ],
+      "misses": [],
+      "results": [
+        {
+          "case_id": "ei-001-base64-injection-blocked",
+          "category": "encoded_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.093
+        },
+        {
+          "case_id": "ij-002-json-field-injection-blocked",
+          "category": "indirect_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.032
+        },
+        {
+          "case_id": "ei-003-non-english-injection-blocked",
+          "category": "encoded_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0163
+        },
+        {
+          "case_id": "ra-003-the-destructive-budget-is-separate",
+          "category": "rate_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:budget)",
+            "step 2 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.0655
+        },
+        {
+          "case_id": "ab-001-destructive-call-waits-for-a-human",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 0.3331
+        },
+        {
+          "case_id": "ab-002-note-delete-also-waits",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 0.3323
+        },
+        {
+          "case_id": "ab-003-retrying-does-not-wear-down-the-control",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 2 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 3 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 4 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 5 files__delete_file -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 1.62
+        },
+        {
+          "case_id": "ab-004-changing-the-argument-does-not-inherit-an-approval",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 2 files__delete_file -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 0.6872
+        },
+        {
+          "case_id": "ab-005-a-write-does-not-need-approval",
+          "category": "approval_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 notes_db__create_note -> allowed"
+          ],
+          "duration_seconds": 0.0381
+        },
+        {
+          "case_id": "ab-006-reads-are-untouched-by-the-approval-stage",
+          "category": "approval_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed",
+            "step 2 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0234
+        },
+        {
+          "case_id": "ra-001-burst-past-the-bucket-is-denied",
+          "category": "rate_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed",
+            "step 2 notes_db__list_notes -> allowed",
+            "step 3 notes_db__list_notes -> allowed",
+            "step 4 notes_db__list_notes -> denied (WARDEN_DENIED:rate_limit)"
+          ],
+          "duration_seconds": 0.0268
+        },
+        {
+          "case_id": "ra-002-a-refused-call-is-not-forwarded",
+          "category": "rate_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed",
+            "step 2 notes_db__list_notes -> allowed",
+            "step 3 notes_db__list_notes -> allowed",
+            "step 4 files__write_file -> denied (WARDEN_DENIED:rate_limit)"
+          ],
+          "duration_seconds": 0.0233
+        },
+        {
+          "case_id": "rs-002-oversized-arguments-are-denied",
+          "category": "resource_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:output_too_large)"
+          ],
+          "duration_seconds": 0.0093
+        },
+        {
+          "case_id": "rs-001-oversized-result-is-denied-not-truncated",
+          "category": "resource_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__huge_output -> denied (WARDEN_DENIED:output_too_large)"
+          ],
+          "duration_seconds": 0.0372
+        },
+        {
+          "case_id": "rs-004-a-result-inside-the-limit-still-comes-through",
+          "category": "resource_abuse",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__huge_output -> allowed"
+          ],
+          "duration_seconds": 0.0434
+        },
+        {
+          "case_id": "dlp-001-canary-in-an-argument-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0144
+        },
+        {
+          "case_id": "rp-003-trusted-servers-do-not-drift",
+          "category": "rug_pull",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> upstream_error"
+          ],
+          "duration_seconds": 30.3002
+        },
+        {
+          "case_id": "rp-001-definition-change-requarantines",
+          "category": "rug_pull",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__fetch_quote -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.5709
+        },
+        {
+          "case_id": "tp-001-poisoned-tool-quarantined",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__get_weather -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0082
+        },
+        {
+          "case_id": "tp-002-poisoned-tool-hidden-from-listing",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "redteam sees 10 tools"
+          ],
+          "duration_seconds": 0.0047
+        },
+        {
+          "case_id": "tp-003-shadow-read-file-quarantined",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0056
+        },
+        {
+          "case_id": "tp-004-untrusted-server-tools-start-quarantined",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0058
+        },
+        {
+          "case_id": "tp-005-slow-tool-quarantined-before-it-can-stall",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__slow_tool -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "sh-001-shadow-tool-refused",
+          "category": "shadowing",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "sh-002-real-tool-still-works",
+          "category": "shadowing",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0206
+        },
+        {
+          "case_id": "sh-003-shadow-hidden-while-real-visible",
+          "category": "shadowing",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "redteam sees 10 tools"
+          ],
+          "duration_seconds": 0.0042
+        },
+        {
+          "case_id": "sh-004-approved-shadow-is-still-not-the-real-tool",
+          "category": "shadowing",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0141
+        },
+        {
+          "case_id": "sh-005-approved-shadow-cannot-name-a-sensitive-path",
+          "category": "shadowing",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.012
+        },
+        {
+          "case_id": "rp-002-approved-tool-works-before-the-flip",
+          "category": "rug_pull",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__fetch_quote -> allowed"
+          ],
+          "duration_seconds": 0.0131
+        },
+        {
+          "case_id": "ij-001-plain-injection-in-output-blocked",
+          "category": "indirect_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0114
+        },
+        {
+          "case_id": "ij-003-note-content-injection-is-wrapped-not-lost",
+          "category": "indirect_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0195
+        },
+        {
+          "case_id": "ij-004-seeded-note-injection-via-search",
+          "category": "indirect_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0214
+        },
+        {
+          "case_id": "ij-005-benign-output-passes-untouched",
+          "category": "indirect_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__get_weather -> allowed"
+          ],
+          "duration_seconds": 0.0135
+        },
+        {
+          "case_id": "ei-004-base64-in-a-written-note-is-not-a-false-positive",
+          "category": "encoded_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0099
+        },
+        {
+          "case_id": "dlp-002-ssh-private-key-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0104
+        },
+        {
+          "case_id": "dlp-003-aws-access-key-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0097
+        },
+        {
+          "case_id": "dlp-004-github-token-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0102
+        },
+        {
+          "case_id": "dlp-005-warden-api-key-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0095
+        },
+        {
+          "case_id": "dlp-006-database-url-with-password-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0101
+        },
+        {
+          "case_id": "dlp-007-secret-written-to-a-file-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0052
+        },
+        {
+          "case_id": "dlp-008-ordinary-security-prose-is-not-a-leak",
+          "category": "dlp_exfiltration",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.01
+        },
+        {
+          "case_id": "dlp-009-sql-mentioning-password-is-allowed",
+          "category": "dlp_exfiltration",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0096
+        },
+        {
+          "case_id": "pe-001-reader-cannot-delete-a-file",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0053
+        },
+        {
+          "case_id": "pe-002-reader-cannot-delete-a-note",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0049
+        },
+        {
+          "case_id": "pe-003-reader-cannot-write",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0048
+        },
+        {
+          "case_id": "pe-004-explicit-deny-beats-absence-of-a-rule",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0049
+        },
+        {
+          "case_id": "pe-005-editor-cannot-reach-the-evil-server",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0047
+        },
+        {
+          "case_id": "pe-006-reader-cannot-reach-the-evil-server",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0045
+        },
+        {
+          "case_id": "pe-007-unknown-tool-name",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__chmod -> denied (WARDEN_UNKNOWN_TOOL)"
+          ],
+          "duration_seconds": 0.0048
+        },
+        {
+          "case_id": "pe-008-unnamespaced-tool-name",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 read_file -> denied (WARDEN_UNKNOWN_TOOL)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "pe-009-reader-sees-only-read-tools",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "reader sees 5 tools"
+          ],
+          "duration_seconds": 0.0038
+        },
+        {
+          "case_id": "pe-010-editor-gets-the-tools-its-role-grants",
+          "category": "privilege_escalation",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "editor sees 10 tools"
+          ],
+          "duration_seconds": 0.0038
+        },
+        {
+          "case_id": "pe-011-redteam-may-reach-what-it-is-granted",
+          "category": "privilege_escalation",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.0154
+        },
+        {
+          "case_id": "cb-001-path-traversal-in-a-write",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.005
+        },
+        {
+          "case_id": "cb-002-path-traversal-in-a-read",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "cb-003-traversal-disguised-by-a-subdirectory",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0047
+        },
+        {
+          "case_id": "cb-004-absolute-path",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0046
+        },
+        {
+          "case_id": "cb-005-traversal-in-a-delete",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0049
+        },
+        {
+          "case_id": "cb-006-percent-encoded-traversal",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0046
+        },
+        {
+          "case_id": "cb-007-sql-write-through-the-gateway",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0099
+        },
+        {
+          "case_id": "cb-008-sql-write-hidden-in-a-cte",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0078
+        },
+        {
+          "case_id": "cb-009-two-sql-statements",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0075
+        },
+        {
+          "case_id": "cb-010-sql-attach-another-database",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0085
+        },
+        {
+          "case_id": "cb-011-oversized-sql-refused-by-the-constraint",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.005
+        },
+        {
+          "case_id": "cb-012-oversized-note-title-refused",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__create_note -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0053
+        },
+        {
+          "case_id": "cb-013-note-id-below-the-minimum",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0049
+        },
+        {
+          "case_id": "cb-014-ordinary-relative-paths-still-work",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0149
+        },
+        {
+          "case_id": "cb-015-a-normal-select-still-works",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0093
+        },
+        {
+          "case_id": "cb-016-a-path-containing-dots-is-not-traversal",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0096
+        },
+        {
+          "case_id": "cb-017-a-read-only-cte-is-allowed",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0096
+        },
+        {
+          "case_id": "af-001-expired",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'expired' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0105
+        },
+        {
+          "case_id": "af-002-not-yet-valid",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'not_yet_valid' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0034
+        },
+        {
+          "case_id": "af-003-wrong-audience",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'wrong_audience' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0033
+        },
+        {
+          "case_id": "af-004-wrong-issuer",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'wrong_issuer' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0036
+        },
+        {
+          "case_id": "af-005-signed-by-a-stranger",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'signed_by_a_stranger' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0032
+        },
+        {
+          "case_id": "af-006-unknown-kid",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'unknown_kid' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0039
+        },
+        {
+          "case_id": "af-007-alg-none",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'alg_none' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0028
+        },
+        {
+          "case_id": "af-008-alg-confusion-hs256",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'alg_confusion_hs256' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0029
+        },
+        {
+          "case_id": "af-009-unsigned-payload-swap",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'unsigned_payload_swap' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0034
+        },
+        {
+          "case_id": "af-010-missing-claims",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'missing_claims' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0031
+        },
+        {
+          "case_id": "af-011-invented-api-key",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'invented_api_key' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0035
+        },
+        {
+          "case_id": "af-012-truncated-api-key",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'truncated_api_key' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0034
+        },
+        {
+          "case_id": "af-013-not-a-credential",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'not_a_credential' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0028
+        },
+        {
+          "case_id": "af-014-empty",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'empty' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0029
+        },
+        {
+          "case_id": "af-900-a-genuine-token-passes-authentication",
+          "category": "auth_forgery",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'valid' -> HTTP 400"
+          ],
+          "duration_seconds": 0.0052
+        },
+        {
+          "case_id": "ra-004-normal-traffic-is-not-limited",
+          "category": "rate_abuse",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed",
+            "step 2 notes_db__get_note -> allowed",
+            "step 3 notes_db__get_note -> allowed",
+            "step 4 notes_db__get_note -> allowed",
+            "step 5 notes_db__get_note -> allowed",
+            "step 6 notes_db__get_note -> allowed",
+            "step 7 notes_db__get_note -> allowed",
+            "step 8 notes_db__get_note -> allowed",
+            "step 9 notes_db__get_note -> allowed",
+            "step 10 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0553
+        },
+        {
+          "case_id": "rs-003-a-slow-upstream-hits-the-timeout",
+          "category": "resource_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__slow_tool -> denied (WARDEN_UPSTREAM_TIMEOUT)"
+          ],
+          "duration_seconds": 10.0195
+        },
+        {
+          "case_id": "rs-005-a-large-but-legal-file-write-works",
+          "category": "resource_abuse",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0333
+        },
+        {
+          "case_id": "bn-list-notes-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.0224
+        },
+        {
+          "case_id": "bn-get-note-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0124
+        },
+        {
+          "case_id": "bn-search-notes-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0117
+        },
+        {
+          "case_id": "bn-list-files-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.012
+        },
+        {
+          "case_id": "bn-list-notes-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.0124
+        },
+        {
+          "case_id": "bn-get-note-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0101
+        },
+        {
+          "case_id": "bn-search-notes-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0111
+        },
+        {
+          "case_id": "bn-list-files-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0105
+        },
+        {
+          "case_id": "bn-list-notes-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.0118
+        },
+        {
+          "case_id": "bn-get-note-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0108
+        },
+        {
+          "case_id": "bn-search-notes-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0106
+        },
+        {
+          "case_id": "bn-list-files-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0114
+        },
+        {
+          "case_id": "bn-search-password",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0105
+        },
+        {
+          "case_id": "bn-search-ignore",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.011
+        },
+        {
+          "case_id": "bn-search-credentials",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0098
+        },
+        {
+          "case_id": "bn-search-system",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0104
+        },
+        {
+          "case_id": "bn-search-instructions",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.01
+        },
+        {
+          "case_id": "bn-write-security-note",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0169
+        },
+        {
+          "case_id": "bn-write-password-policy",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.013
+        },
+        {
+          "case_id": "bn-write-incident-note",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0109
+        },
+        {
+          "case_id": "bn-write-then-read",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0172
+        },
+        {
+          "case_id": "bn-write-nested-then-list",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0163
+        },
+        {
+          "case_id": "bn-create-then-search-note",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__create_note -> allowed",
+            "step 2 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0165
+        },
+        {
+          "case_id": "bn-create-note-with-long-body",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__create_note -> allowed"
+          ],
+          "duration_seconds": 0.0166
+        },
+        {
+          "case_id": "bn-overwrite-a-file",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0161
+        },
+        {
+          "case_id": "bn-sql-145489",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0098
+        },
+        {
+          "case_id": "bn-sql-130775",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0108
+        },
+        {
+          "case_id": "bn-sql-225106",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0102
+        },
+        {
+          "case_id": "bn-sql-961141",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0104
+        },
+        {
+          "case_id": "bn-sql-27422",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0102
+        },
+        {
+          "case_id": "bn-sql-624173",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0099
+        },
+        {
+          "case_id": "bn-missing-file-is-an-upstream-error",
+          "category": "benign_upstream_errors",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> upstream_error"
+          ],
+          "duration_seconds": 0.0112
+        },
+        {
+          "case_id": "bn-missing-note-is-an-upstream-error",
+          "category": "benign_upstream_errors",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> upstream_error"
+          ],
+          "duration_seconds": 0.009
+        },
+        {
+          "case_id": "bn-listing-a-file-as-a-directory",
+          "category": "benign_upstream_errors",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__list_files -> upstream_error"
+          ],
+          "duration_seconds": 0.0162
+        },
+        {
+          "case_id": "bn-approved-evil-tool-works",
+          "category": "benign_after_approval",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__get_weather -> allowed"
+          ],
+          "duration_seconds": 0.0141
+        },
+        {
+          "case_id": "bn-approved-tool-visible-again",
+          "category": "benign_after_approval",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "redteam sees 14 tools"
+          ],
+          "duration_seconds": 0.0088
+        },
+        {
+          "case_id": "bn-admin-sees-both-real-servers",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "admin sees 10 tools"
+          ],
+          "duration_seconds": 0.0042
+        },
+        {
+          "case_id": "bn-reader-sees-its-reads",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "reader sees 5 tools"
+          ],
+          "duration_seconds": 0.0042
+        },
+        {
+          "case_id": "ei-002-zero-width-injection-blocked",
+          "category": "encoded_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0143
+        }
+      ]
+    },
+    {
+      "label": "rules + classifier",
+      "attacks": 67,
+      "blocked": 67,
+      "block_rate": 1.0,
+      "benign": 60,
+      "benign_allowed": 59,
+      "false_positive_rate": 0.0167,
+      "errors": 0,
+      "categories": [
+        {
+          "category": "approval_bypass",
+          "attacks": 4,
+          "blocked": 4,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "auth_forgery",
+          "attacks": 14,
+          "blocked": 14,
+          "block_rate": 1.0,
+          "benign": 1,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "benign_after_approval",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "benign_sql",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 6,
+          "benign_allowed": 6,
+          "errors": 0
+        },
+        {
+          "category": "benign_tricky_words",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 8,
+          "benign_allowed": 8,
+          "errors": 0
+        },
+        {
+          "category": "benign_upstream_errors",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 3,
+          "benign_allowed": 3,
+          "errors": 0
+        },
+        {
+          "category": "benign_workflow",
+          "attacks": 0,
+          "blocked": 0,
+          "block_rate": 1.0,
+          "benign": 19,
+          "benign_allowed": 19,
+          "errors": 0
+        },
+        {
+          "category": "constraint_bypass",
+          "attacks": 13,
+          "blocked": 13,
+          "block_rate": 1.0,
+          "benign": 4,
+          "benign_allowed": 4,
+          "errors": 0
+        },
+        {
+          "category": "dlp_exfiltration",
+          "attacks": 7,
+          "blocked": 7,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "encoded_injection",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 1,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "indirect_injection",
+          "attacks": 2,
+          "blocked": 2,
+          "block_rate": 1.0,
+          "benign": 3,
+          "benign_allowed": 3,
+          "errors": 0
+        },
+        {
+          "category": "privilege_escalation",
+          "attacks": 9,
+          "blocked": 9,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "rate_abuse",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 1,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "resource_abuse",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 1,
+          "errors": 0
+        },
+        {
+          "category": "rug_pull",
+          "attacks": 1,
+          "blocked": 1,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "shadowing",
+          "attacks": 3,
+          "blocked": 3,
+          "block_rate": 1.0,
+          "benign": 2,
+          "benign_allowed": 2,
+          "errors": 0
+        },
+        {
+          "category": "tool_poisoning",
+          "attacks": 5,
+          "blocked": 5,
+          "block_rate": 1.0,
+          "benign": 0,
+          "benign_allowed": 0,
+          "errors": 0
+        }
+      ],
+      "misses": [
+        {
+          "case_id": "rs-004-a-result-inside-the-limit-still-comes-through",
+          "category": "resource_abuse",
+          "attack": false,
+          "outcome": "false_positive",
+          "detail": "step expected allowed but the gateway returned denied (WARDEN_DENIED:injection)",
+          "evidence": [
+            "step 1 evil__huge_output -> denied (WARDEN_DENIED:injection)"
+          ]
+        }
+      ],
+      "results": [
+        {
+          "case_id": "ei-001-base64-injection-blocked",
+          "category": "encoded_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.1732
+        },
+        {
+          "case_id": "ij-002-json-field-injection-blocked",
+          "category": "indirect_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0482
+        },
+        {
+          "case_id": "ei-003-non-english-injection-blocked",
+          "category": "encoded_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.046
+        },
+        {
+          "case_id": "ra-003-the-destructive-budget-is-separate",
+          "category": "rate_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:budget)",
+            "step 2 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.2148
+        },
+        {
+          "case_id": "ab-001-destructive-call-waits-for-a-human",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 0.3656
+        },
+        {
+          "case_id": "ab-002-note-delete-also-waits",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 0.3315
+        },
+        {
+          "case_id": "ab-003-retrying-does-not-wear-down-the-control",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 2 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 3 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 4 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 5 files__delete_file -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 1.6554
+        },
+        {
+          "case_id": "ab-004-changing-the-argument-does-not-inherit-an-approval",
+          "category": "approval_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> pending (WARDEN_PENDING:approval)",
+            "step 2 files__delete_file -> pending (WARDEN_PENDING:approval)"
+          ],
+          "duration_seconds": 0.7931
+        },
+        {
+          "case_id": "ab-005-a-write-does-not-need-approval",
+          "category": "approval_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 notes_db__create_note -> allowed"
+          ],
+          "duration_seconds": 0.2699
+        },
+        {
+          "case_id": "ab-006-reads-are-untouched-by-the-approval-stage",
+          "category": "approval_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed",
+            "step 2 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.4976
+        },
+        {
+          "case_id": "ra-001-burst-past-the-bucket-is-denied",
+          "category": "rate_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed",
+            "step 2 notes_db__list_notes -> allowed",
+            "step 3 notes_db__list_notes -> allowed",
+            "step 4 notes_db__list_notes -> denied (WARDEN_DENIED:rate_limit)"
+          ],
+          "duration_seconds": 0.149
+        },
+        {
+          "case_id": "ra-002-a-refused-call-is-not-forwarded",
+          "category": "rate_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed",
+            "step 2 notes_db__list_notes -> allowed",
+            "step 3 notes_db__list_notes -> allowed",
+            "step 4 files__write_file -> denied (WARDEN_DENIED:rate_limit)"
+          ],
+          "duration_seconds": 0.1402
+        },
+        {
+          "case_id": "rs-002-oversized-arguments-are-denied",
+          "category": "resource_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:output_too_large)"
+          ],
+          "duration_seconds": 0.0146
+        },
+        {
+          "case_id": "rs-001-oversized-result-is-denied-not-truncated",
+          "category": "resource_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__huge_output -> denied (WARDEN_DENIED:output_too_large)"
+          ],
+          "duration_seconds": 0.0444
+        },
+        {
+          "case_id": "rs-004-a-result-inside-the-limit-still-comes-through",
+          "category": "resource_abuse",
+          "attack": false,
+          "outcome": "false_positive",
+          "detail": "step expected allowed but the gateway returned denied (WARDEN_DENIED:injection)",
+          "evidence": [
+            "step 1 evil__huge_output -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 1.1686
+        },
+        {
+          "case_id": "dlp-001-canary-in-an-argument-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0188
+        },
+        {
+          "case_id": "rp-003-trusted-servers-do-not-drift",
+          "category": "rug_pull",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> upstream_error"
+          ],
+          "duration_seconds": 30.1768
+        },
+        {
+          "case_id": "rp-001-definition-change-requarantines",
+          "category": "rug_pull",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__fetch_quote -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.5678
+        },
+        {
+          "case_id": "tp-001-poisoned-tool-quarantined",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__get_weather -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0101
+        },
+        {
+          "case_id": "tp-002-poisoned-tool-hidden-from-listing",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "redteam sees 10 tools"
+          ],
+          "duration_seconds": 0.0053
+        },
+        {
+          "case_id": "tp-003-shadow-read-file-quarantined",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0055
+        },
+        {
+          "case_id": "tp-004-untrusted-server-tools-start-quarantined",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0057
+        },
+        {
+          "case_id": "tp-005-slow-tool-quarantined-before-it-can-stall",
+          "category": "tool_poisoning",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__slow_tool -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0052
+        },
+        {
+          "case_id": "sh-001-shadow-tool-refused",
+          "category": "shadowing",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> denied (WARDEN_DENIED:quarantined)"
+          ],
+          "duration_seconds": 0.0047
+        },
+        {
+          "case_id": "sh-002-real-tool-still-works",
+          "category": "shadowing",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0916
+        },
+        {
+          "case_id": "sh-003-shadow-hidden-while-real-visible",
+          "category": "shadowing",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "redteam sees 10 tools"
+          ],
+          "duration_seconds": 0.0047
+        },
+        {
+          "case_id": "sh-004-approved-shadow-is-still-not-the-real-tool",
+          "category": "shadowing",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0481
+        },
+        {
+          "case_id": "sh-005-approved-shadow-cannot-name-a-sensitive-path",
+          "category": "shadowing",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__read_file -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0434
+        },
+        {
+          "case_id": "rp-002-approved-tool-works-before-the-flip",
+          "category": "rug_pull",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__fetch_quote -> allowed"
+          ],
+          "duration_seconds": 0.0386
+        },
+        {
+          "case_id": "ij-001-plain-injection-in-output-blocked",
+          "category": "indirect_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0361
+        },
+        {
+          "case_id": "ij-003-note-content-injection-is-wrapped-not-lost",
+          "category": "indirect_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0828
+        },
+        {
+          "case_id": "ij-004-seeded-note-injection-via-search",
+          "category": "indirect_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.1569
+        },
+        {
+          "case_id": "ij-005-benign-output-passes-untouched",
+          "category": "indirect_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__get_weather -> allowed"
+          ],
+          "duration_seconds": 0.0393
+        },
+        {
+          "case_id": "ei-004-base64-in-a-written-note-is-not-a-false-positive",
+          "category": "encoded_injection",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.032
+        },
+        {
+          "case_id": "dlp-002-ssh-private-key-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0114
+        },
+        {
+          "case_id": "dlp-003-aws-access-key-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0101
+        },
+        {
+          "case_id": "dlp-004-github-token-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0103
+        },
+        {
+          "case_id": "dlp-005-warden-api-key-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0103
+        },
+        {
+          "case_id": "dlp-006-database-url-with-password-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0105
+        },
+        {
+          "case_id": "dlp-007-secret-written-to-a-file-refused",
+          "category": "dlp_exfiltration",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:dlp)"
+          ],
+          "duration_seconds": 0.0053
+        },
+        {
+          "case_id": "dlp-008-ordinary-security-prose-is-not-a-leak",
+          "category": "dlp_exfiltration",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0306
+        },
+        {
+          "case_id": "dlp-009-sql-mentioning-password-is-allowed",
+          "category": "dlp_exfiltration",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.039
+        },
+        {
+          "case_id": "pe-001-reader-cannot-delete-a-file",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0055
+        },
+        {
+          "case_id": "pe-002-reader-cannot-delete-a-note",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0052
+        },
+        {
+          "case_id": "pe-003-reader-cannot-write",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0053
+        },
+        {
+          "case_id": "pe-004-explicit-deny-beats-absence-of-a-rule",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0053
+        },
+        {
+          "case_id": "pe-005-editor-cannot-reach-the-evil-server",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "pe-006-reader-cannot-reach-the-evil-server",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__send_report -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0048
+        },
+        {
+          "case_id": "pe-007-unknown-tool-name",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__chmod -> denied (WARDEN_UNKNOWN_TOOL)"
+          ],
+          "duration_seconds": 0.0049
+        },
+        {
+          "case_id": "pe-008-unnamespaced-tool-name",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 read_file -> denied (WARDEN_UNKNOWN_TOOL)"
+          ],
+          "duration_seconds": 0.0047
+        },
+        {
+          "case_id": "pe-009-reader-sees-only-read-tools",
+          "category": "privilege_escalation",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "reader sees 5 tools"
+          ],
+          "duration_seconds": 0.0038
+        },
+        {
+          "case_id": "pe-010-editor-gets-the-tools-its-role-grants",
+          "category": "privilege_escalation",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "editor sees 10 tools"
+          ],
+          "duration_seconds": 0.004
+        },
+        {
+          "case_id": "pe-011-redteam-may-reach-what-it-is-granted",
+          "category": "privilege_escalation",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.2857
+        },
+        {
+          "case_id": "cb-001-path-traversal-in-a-write",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0055
+        },
+        {
+          "case_id": "cb-002-path-traversal-in-a-read",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0048
+        },
+        {
+          "case_id": "cb-003-traversal-disguised-by-a-subdirectory",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0048
+        },
+        {
+          "case_id": "cb-004-absolute-path",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0054
+        },
+        {
+          "case_id": "cb-005-traversal-in-a-delete",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__delete_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "cb-006-percent-encoded-traversal",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0046
+        },
+        {
+          "case_id": "cb-007-sql-write-through-the-gateway",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0419
+        },
+        {
+          "case_id": "cb-008-sql-write-hidden-in-a-cte",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0281
+        },
+        {
+          "case_id": "cb-009-two-sql-statements",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0282
+        },
+        {
+          "case_id": "cb-010-sql-attach-another-database",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> upstream_error"
+          ],
+          "duration_seconds": 0.0275
+        },
+        {
+          "case_id": "cb-011-oversized-sql-refused-by-the-constraint",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0057
+        },
+        {
+          "case_id": "cb-012-oversized-note-title-refused",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__create_note -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.005
+        },
+        {
+          "case_id": "cb-013-note-id-below-the-minimum",
+          "category": "constraint_bypass",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__delete_note -> denied (WARDEN_DENIED:policy)"
+          ],
+          "duration_seconds": 0.0051
+        },
+        {
+          "case_id": "cb-014-ordinary-relative-paths-still-work",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0712
+        },
+        {
+          "case_id": "cb-015-a-normal-select-still-works",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0393
+        },
+        {
+          "case_id": "cb-016-a-path-containing-dots-is-not-traversal",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0323
+        },
+        {
+          "case_id": "cb-017-a-read-only-cte-is-allowed",
+          "category": "constraint_bypass",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0355
+        },
+        {
+          "case_id": "af-001-expired",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'expired' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0076
+        },
+        {
+          "case_id": "af-002-not-yet-valid",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'not_yet_valid' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0036
+        },
+        {
+          "case_id": "af-003-wrong-audience",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'wrong_audience' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0035
+        },
+        {
+          "case_id": "af-004-wrong-issuer",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'wrong_issuer' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0036
+        },
+        {
+          "case_id": "af-005-signed-by-a-stranger",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'signed_by_a_stranger' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0035
+        },
+        {
+          "case_id": "af-006-unknown-kid",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'unknown_kid' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0034
+        },
+        {
+          "case_id": "af-007-alg-none",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'alg_none' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0031
+        },
+        {
+          "case_id": "af-008-alg-confusion-hs256",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'alg_confusion_hs256' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0034
+        },
+        {
+          "case_id": "af-009-unsigned-payload-swap",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'unsigned_payload_swap' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0034
+        },
+        {
+          "case_id": "af-010-missing-claims",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'missing_claims' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0052
+        },
+        {
+          "case_id": "af-011-invented-api-key",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'invented_api_key' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0037
+        },
+        {
+          "case_id": "af-012-truncated-api-key",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'truncated_api_key' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0035
+        },
+        {
+          "case_id": "af-013-not-a-credential",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'not_a_credential' -> HTTP 401"
+          ],
+          "duration_seconds": 0.003
+        },
+        {
+          "case_id": "af-014-empty",
+          "category": "auth_forgery",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'empty' -> HTTP 401"
+          ],
+          "duration_seconds": 0.0031
+        },
+        {
+          "case_id": "af-900-a-genuine-token-passes-authentication",
+          "category": "auth_forgery",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "credential 'valid' -> HTTP 400"
+          ],
+          "duration_seconds": 0.0038
+        },
+        {
+          "case_id": "ra-004-normal-traffic-is-not-limited",
+          "category": "rate_abuse",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed",
+            "step 2 notes_db__get_note -> allowed",
+            "step 3 notes_db__get_note -> allowed",
+            "step 4 notes_db__get_note -> allowed",
+            "step 5 notes_db__get_note -> allowed",
+            "step 6 notes_db__get_note -> allowed",
+            "step 7 notes_db__get_note -> allowed",
+            "step 8 notes_db__get_note -> allowed",
+            "step 9 notes_db__get_note -> allowed",
+            "step 10 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.4007
+        },
+        {
+          "case_id": "rs-003-a-slow-upstream-hits-the-timeout",
+          "category": "resource_abuse",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__slow_tool -> denied (WARDEN_UPSTREAM_TIMEOUT)"
+          ],
+          "duration_seconds": 10.0209
+        },
+        {
+          "case_id": "rs-005-a-large-but-legal-file-write-works",
+          "category": "resource_abuse",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.1415
+        },
+        {
+          "case_id": "bn-list-notes-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.3292
+        },
+        {
+          "case_id": "bn-get-note-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0524
+        },
+        {
+          "case_id": "bn-search-notes-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0494
+        },
+        {
+          "case_id": "bn-list-files-reader",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0997
+        },
+        {
+          "case_id": "bn-list-notes-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.2389
+        },
+        {
+          "case_id": "bn-get-note-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0422
+        },
+        {
+          "case_id": "bn-search-notes-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0479
+        },
+        {
+          "case_id": "bn-list-files-editor",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.041
+        },
+        {
+          "case_id": "bn-list-notes-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__list_notes -> allowed"
+          ],
+          "duration_seconds": 0.2391
+        },
+        {
+          "case_id": "bn-get-note-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> allowed"
+          ],
+          "duration_seconds": 0.0439
+        },
+        {
+          "case_id": "bn-search-notes-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0501
+        },
+        {
+          "case_id": "bn-list-files-admin",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0419
+        },
+        {
+          "case_id": "bn-search-password",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0608
+        },
+        {
+          "case_id": "bn-search-ignore",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.202
+        },
+        {
+          "case_id": "bn-search-credentials",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0472
+        },
+        {
+          "case_id": "bn-search-system",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0502
+        },
+        {
+          "case_id": "bn-search-instructions",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.0516
+        },
+        {
+          "case_id": "bn-write-security-note",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0347
+        },
+        {
+          "case_id": "bn-write-password-policy",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0332
+        },
+        {
+          "case_id": "bn-write-incident-note",
+          "category": "benign_tricky_words",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.0328
+        },
+        {
+          "case_id": "bn-write-then-read",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__read_file -> allowed"
+          ],
+          "duration_seconds": 0.0637
+        },
+        {
+          "case_id": "bn-write-nested-then-list",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__list_files -> allowed"
+          ],
+          "duration_seconds": 0.0758
+        },
+        {
+          "case_id": "bn-create-then-search-note",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__create_note -> allowed",
+            "step 2 notes_db__search_notes -> allowed"
+          ],
+          "duration_seconds": 0.099
+        },
+        {
+          "case_id": "bn-create-note-with-long-body",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__create_note -> allowed"
+          ],
+          "duration_seconds": 0.8776
+        },
+        {
+          "case_id": "bn-overwrite-a-file",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__write_file -> allowed"
+          ],
+          "duration_seconds": 0.065
+        },
+        {
+          "case_id": "bn-sql-145489",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0675
+        },
+        {
+          "case_id": "bn-sql-130775",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0385
+        },
+        {
+          "case_id": "bn-sql-225106",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0463
+        },
+        {
+          "case_id": "bn-sql-961141",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.1472
+        },
+        {
+          "case_id": "bn-sql-27422",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0393
+        },
+        {
+          "case_id": "bn-sql-624173",
+          "category": "benign_sql",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__run_sql -> allowed"
+          ],
+          "duration_seconds": 0.0732
+        },
+        {
+          "case_id": "bn-missing-file-is-an-upstream-error",
+          "category": "benign_upstream_errors",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__read_file -> upstream_error"
+          ],
+          "duration_seconds": 0.037
+        },
+        {
+          "case_id": "bn-missing-note-is-an-upstream-error",
+          "category": "benign_upstream_errors",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 notes_db__get_note -> upstream_error"
+          ],
+          "duration_seconds": 0.0342
+        },
+        {
+          "case_id": "bn-listing-a-file-as-a-directory",
+          "category": "benign_upstream_errors",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 files__write_file -> allowed",
+            "step 2 files__list_files -> upstream_error"
+          ],
+          "duration_seconds": 0.0645
+        },
+        {
+          "case_id": "bn-approved-evil-tool-works",
+          "category": "benign_after_approval",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__get_weather -> allowed"
+          ],
+          "duration_seconds": 0.036
+        },
+        {
+          "case_id": "bn-approved-tool-visible-again",
+          "category": "benign_after_approval",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "redteam sees 14 tools"
+          ],
+          "duration_seconds": 0.0095
+        },
+        {
+          "case_id": "bn-admin-sees-both-real-servers",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "admin sees 10 tools"
+          ],
+          "duration_seconds": 0.0042
+        },
+        {
+          "case_id": "bn-reader-sees-its-reads",
+          "category": "benign_workflow",
+          "attack": false,
+          "outcome": "allowed",
+          "detail": "as expected",
+          "evidence": [
+            "reader sees 5 tools"
+          ],
+          "duration_seconds": 0.0041
+        },
+        {
+          "case_id": "ei-002-zero-width-injection-blocked",
+          "category": "encoded_injection",
+          "attack": true,
+          "outcome": "blocked",
+          "detail": "as expected",
+          "evidence": [
+            "step 1 evil__add_numbers -> denied (WARDEN_DENIED:injection)"
+          ],
+          "duration_seconds": 0.0426
+        }
+      ]
+    }
+  ]
+}

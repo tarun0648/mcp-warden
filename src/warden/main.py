@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from typing import Any
 
 from mcp.server.lowlevel.server import Server
@@ -372,6 +372,29 @@ async def _close_owned(db: Database | None, redis_client: Any | None) -> None:
                 await closer()
 
 
+def _select_pipeline(
+    wanted: Sequence[str] | None, factory: Callable[[], Pipeline]
+) -> Callable[[], Pipeline]:
+    """Keep only the named stages, in the pipeline's own order.
+
+    Used by the latency benchmark to measure a cut-down gateway. The order is never taken from
+    the caller - it is always the pipeline's - so a benchmark cannot accidentally measure a
+    configuration that could not exist. The finish hooks are kept either way, because a
+    gateway that does not write its audit log is not a configuration anyone would deploy.
+    """
+    if wanted is None:
+        return factory
+    allowed = set(wanted)
+
+    def reduced() -> Pipeline:
+        full = factory()
+        return Pipeline(
+            [stage for stage in full.stages if stage.name in allowed], full.finish_hooks
+        )
+
+    return reduced
+
+
 def create_app(
     settings: Settings,
     *,
@@ -384,6 +407,10 @@ def create_app(
     redis: Any | None = None,
     injection_classifier: InjectionClassifier | None = None,
     metrics: Metrics | None = None,
+    #: Replace the pipeline entirely. The latency benchmark uses this to measure a
+    #: cut-down gateway (auth and policy only) against the full one, which is the only way to
+    #: say what each stage costs rather than what the whole thing costs.
+    pipeline_stages: Sequence[str] | None = None,
     revocations: RevocationStore | None = None,
     mount_mcp: bool = True,
     upstream_wait_seconds: float = 0.0,
@@ -514,20 +541,23 @@ def create_app(
             servers_config=servers,
             registry=registry,
             upstreams=manager,
-            pipeline_factory=build_pipeline_factory(
-                registry,
-                servers,
-                manager,
-                policies,
-                limiter,
-                gateway.limits,
-                audit,
-                pins,
-                gateway.scan,
-                output_scanner,
-                approvals,
-                gateway.approval.wait_seconds,
-                telemetry,
+            pipeline_factory=_select_pipeline(
+                pipeline_stages,
+                build_pipeline_factory(
+                    registry,
+                    servers,
+                    manager,
+                    policies,
+                    limiter,
+                    gateway.limits,
+                    audit,
+                    pins,
+                    gateway.scan,
+                    output_scanner,
+                    approvals,
+                    gateway.approval.wait_seconds,
+                    telemetry,
+                ),
             ),
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
             tool_filter=build_tool_filter(policies, pins),

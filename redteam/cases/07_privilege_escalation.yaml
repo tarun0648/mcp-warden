@@ -1,0 +1,140 @@
+# Privilege escalation: reaching a tool outside the caller's role.
+cases:
+- id: pe-001-reader-cannot-delete-a-file
+  category: privilege_escalation
+  attack: true
+  role: reader
+  description: A reader naming the delete tool directly is refused by the policy.
+  steps:
+  - tool: files__delete_file
+    args:
+      path: notes/a.md
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: pe-002-reader-cannot-delete-a-note
+  category: privilege_escalation
+  attack: true
+  role: reader
+  description: The same for the notes server's destructive tool.
+  steps:
+  - tool: notes_db__delete_note
+    args:
+      note_id: 1
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: pe-003-reader-cannot-write
+  category: privilege_escalation
+  attack: true
+  role: reader
+  description: A read-only role must not be able to write.
+  steps:
+  - tool: files__write_file
+    args:
+      path: notes/sneaky.md
+      content: x
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: pe-004-explicit-deny-beats-absence-of-a-rule
+  category: privilege_escalation
+  attack: true
+  role: reader
+  description: Ad-hoc SQL is denied to readers by a named rule, not merely left unlisted. A matching
+    deny must win over everything else.
+  steps:
+  - tool: notes_db__run_sql
+    args:
+      query: SELECT 1
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: pe-005-editor-cannot-reach-the-evil-server
+  category: privilege_escalation
+  attack: true
+  role: editor
+  description: Only the redteam role may go near the malicious server. An editor naming its tools
+    is refused by policy, before any scanner is consulted.
+  steps:
+  - tool: evil__add_numbers
+    args:
+      a: 1
+      b: 2
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: pe-006-reader-cannot-reach-the-evil-server
+  category: privilege_escalation
+  attack: true
+  role: reader
+  description: The same for a reader, whose policy mentions neither the server nor its tools.
+  steps:
+  - tool: evil__send_report
+    args:
+      to: a@b.c
+      body: x
+    expect: denied
+    reason: WARDEN_DENIED:policy
+- id: pe-007-unknown-tool-name
+  category: privilege_escalation
+  attack: true
+  role: admin
+  description: A tool that does not exist is refused rather than probed for, even for an admin.
+  steps:
+  - tool: files__chmod
+    args:
+      path: /
+      mode: 777
+    expect: denied
+    reason: WARDEN_UNKNOWN_TOOL
+- id: pe-008-unnamespaced-tool-name
+  category: privilege_escalation
+  attack: true
+  role: admin
+  description: A bare tool name, as if addressing an upstream directly rather than through the namespace.
+  steps:
+  - tool: read_file
+    args:
+      path: /etc/passwd
+    expect: denied
+    reason: WARDEN_UNKNOWN_TOOL
+- id: pe-009-reader-sees-only-read-tools
+  category: privilege_escalation
+  attack: true
+  role: reader
+  kind: listing
+  description: A reader must not even learn that the delete tools exist. Hiding them is part of the
+    control, not cosmetics.
+  listing:
+    visible:
+    - notes_db__list_notes
+    - files__read_file
+    hidden:
+    - files__delete_file
+    - files__write_file
+    - notes_db__delete_note
+    - notes_db__run_sql
+- id: pe-010-editor-gets-the-tools-its-role-grants
+  category: privilege_escalation
+  attack: false
+  role: editor
+  kind: listing
+  description: The no-false-positive partner. An editor can see everything its role grants, and still
+    nothing from the untrusted server.
+  listing:
+    visible:
+    - files__read_file
+    - files__write_file
+    - files__delete_file
+    - notes_db__run_sql
+    hidden:
+    - evil__get_weather
+- id: pe-011-redteam-may-reach-what-it-is-granted
+  category: privilege_escalation
+  attack: false
+  role: redteam
+  description: The redteam role exists to reach the evil server on purpose, so its own grants must
+    work once a tool is approved.
+  pre_approve:
+  - evil__add_numbers
+  steps:
+  - tool: notes_db__list_notes
+    args:
+      limit: 2
+    expect: allowed

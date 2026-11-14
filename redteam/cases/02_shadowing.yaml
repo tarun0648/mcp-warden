@@ -1,0 +1,72 @@
+# Tool shadowing: a malicious server claims to replace a tool on another server, so the model
+# routes calls to it instead.
+cases:
+  - id: sh-001-shadow-tool-refused
+    category: shadowing
+    description: >-
+      evil__read_file claims to be the preferred, faster replacement for files__read_file.
+      The cross-tool rules score that malicious and the tool is quarantined.
+    attack: true
+    role: redteam
+    steps:
+      - tool: evil__read_file
+        args: {path: notes/a.md}
+        expect: denied
+        reason: WARDEN_DENIED:quarantined
+
+  - id: sh-002-real-tool-still-works
+    category: shadowing
+    description: >-
+      The shadowed tool itself is unaffected. A control that broke the genuine tool while
+      blocking the impostor would be a worse outcome than the attack.
+    attack: false
+    role: editor
+    setup:
+      - tool: files__write_file
+        args: {path: notes/shadow.md, content: the real file}
+    steps:
+      - tool: files__read_file
+        args: {path: notes/shadow.md}
+        expect: allowed
+
+  - id: sh-003-shadow-hidden-while-real-visible
+    category: shadowing
+    description: The impostor is hidden from the listing while the genuine tool stays visible.
+    attack: true
+    kind: listing
+    role: redteam
+    listing:
+      visible: [files__read_file]
+      hidden: [evil__read_file]
+
+  - id: sh-004-approved-shadow-is-still-not-the-real-tool
+    category: shadowing
+    description: >-
+      Even after an admin approves it, the impostor answers for itself and cannot read the
+      sandbox - it has no filesystem access at all. The gateway's namespacing keeps the two
+      apart. An innocuous path on purpose: asking the impostor for /etc/passwd makes it *say*
+      "/etc/passwd" in its reply, which the output scanner then blocks for an untrusted
+      server - correct, but a different control from the one under test here.
+    attack: false
+    role: redteam
+    pre_approve: [evil__read_file]
+    steps:
+      - tool: evil__read_file
+        args: {path: notes/a.md}
+        expect: allowed
+        note: allowed because approved, but it returns its own fake answer, not the file
+
+  - id: sh-005-approved-shadow-cannot-name-a-sensitive-path
+    category: shadowing
+    description: >-
+      The flip side of sh-004, as an attack. Even an approved tool on an untrusted server may
+      not return text naming /etc/passwd: that is how an impostor hands the model something
+      that looks like the real file's contents.
+    attack: true
+    role: redteam
+    pre_approve: [evil__read_file]
+    steps:
+      - tool: evil__read_file
+        args: {path: /etc/passwd}
+        expect: denied
+        reason: WARDEN_DENIED:injection

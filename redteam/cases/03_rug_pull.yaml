@@ -1,0 +1,51 @@
+# Rug pull: a definition that was benign when it was approved and is not any more.
+cases:
+  - id: rp-001-definition-change-requarantines
+    category: rug_pull
+    description: >-
+      fetch_quote is benign for the first two tools/list calls, then its description turns
+      malicious. Approved while benign, the tool must be quarantined again once the hash
+      changes - approved once does not mean approved for ever.
+    attack: true
+    role: redteam
+    gateway:
+      upstream_health_interval_seconds: 0.5
+      tools_refresh_seconds: 0.5
+    pre_approve: [evil__fetch_quote]
+    refresh_listings: 4
+    steps:
+      - tool: evil__fetch_quote
+        args: {symbol: AAPL}
+        expect: denied
+        reason: WARDEN_DENIED:quarantined
+        note: the pinned hash no longer matches the definition the server is serving
+
+  - id: rp-002-approved-tool-works-before-the-flip
+    category: rug_pull
+    description: >-
+      The other half: while the definition still matches its pin, the approved tool works.
+      Without this the previous case would pass even if approval never worked at all.
+    attack: false
+    role: redteam
+    pre_approve: [evil__fetch_quote]
+    steps:
+      - tool: evil__fetch_quote
+        args: {symbol: AAPL}
+        expect: allowed
+
+  - id: rp-003-trusted-servers-do-not-drift
+    category: rug_pull
+    description: >-
+      A stable upstream must never be quarantined by the refresh loop. A rug-pull detector that
+      fires on its own servers would be turned off within a day.
+    attack: false
+    role: editor
+    gateway:
+      upstream_health_interval_seconds: 0.3
+      tools_refresh_seconds: 0.3
+    refresh_listings: 6
+    steps:
+      - tool: files__read_file
+        args: {path: notes/stable.md}
+        expect: upstream_error
+        note: no such file, which is the files server answering - not the gateway refusing

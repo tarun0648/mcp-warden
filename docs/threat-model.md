@@ -156,3 +156,38 @@ instructions.
   outside the gateway; doing that pinning is not implemented.
 - **SQLite has no roles**, so the append-only property of the audit log rests on the hash chain
   alone there. `warden db harden` makes it a grant on Postgres.
+
+
+## Phase 11 — what the red-team suite actually measured
+
+`make redteam` runs 127 cases - 67 attacks across 12 categories and 60 benign calls - through a
+real MCP client against a real gateway with the malicious server enabled. Full numbers in
+`results/redteam-<date>.md`; this section is the summary and the gaps.
+
+| Configuration | Attacks blocked | Benign allowed | False positives |
+| --- | --- | --- | --- |
+| rules only | 67/67 (100.0%) | 60/60 | 0.0% |
+| rules + classifier | 67/67 (100.0%) | 59/60 | 1.7% |
+
+### Findings from this run
+
+- **rules only**: no attack got through and no benign call was refused (67/67 blocked, 60/60 allowed).
+- **rules + classifier** — false positive in `rs-004-a-result-inside-the-limit-still-comes-through` (resource_abuse): step expected allowed but the gateway returned denied (WARDEN_DENIED:injection)
+
+The classifier column is the point of running both: it adds **no** detection over the rules on
+this suite and costs one false positive, which is the same conclusion the labelled dataset
+reached in Phase 8 by a completely different route. Two independent measurements agreeing is
+why the classifier ships switched off and cannot decide on its own.
+
+### What this suite does *not* cover
+
+- **A novel attack nobody has written a case for.** The suite measures the attacks it contains.
+  100% on 67 cases is 100% of 67 cases, not of the space.
+- **A model that ignores the wrapper.** Trusted-server output is returned fenced and labelled;
+  whether the model honours that warning is outside the gateway.
+- **Multi-turn manipulation.** Every case is one or a few calls. An attack spread over a long
+  conversation, where each call is individually innocuous, would pass.
+- **Approval fatigue.** The suite proves an approval is required and un-replayable. It cannot
+  prove a human reads the diff rather than clicking approve.
+- **A compromised gateway.** Everything here assumes the gateway's own process and keys are
+  intact. The audit log is tamper-*evident*, not tamper-proof.

@@ -115,7 +115,7 @@ def test_servers_config(tmp_path: Path, *, include_evil: bool = False, **overrid
     from warden.config import Risk, ServersConfig
 
     sandbox = tmp_path / "sandbox"
-    sandbox.mkdir(exist_ok=True)
+    sandbox.mkdir(parents=True, exist_ok=True)
     upstreams = [
         stdio_upstream(
             "notes_db",
@@ -358,6 +358,7 @@ def running_gateway(
     policies_config: Any | None = None,
     redis: Any | None = None,
     mint_keys: bool = True,
+    pipeline_stages: Any | None = None,
     wait_upstreams: float = 40.0,
     **servers_kwargs: Any,
 ) -> Iterator[RunningGateway]:
@@ -390,6 +391,7 @@ def running_gateway(
         # against fakeredis and its own Redis-marked integration test.
         revocations=NullRevocationStore(),
         redis=redis_client,
+        pipeline_stages=pipeline_stages,
         upstream_wait_seconds=wait_upstreams,
     )
     with serve_app(app) as handle:

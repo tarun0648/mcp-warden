@@ -1,0 +1,130 @@
+# Auth forgery: every shape of bad credential, presented straight to /mcp over HTTP.
+# These bypass the MCP client deliberately - an attacker has no client to be well-behaved for.
+cases:
+- id: af-001-expired
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A token whose exp has passed.
+  http:
+    credential: expired
+    expect_status: 401
+- id: af-002-not-yet-valid
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A token whose nbf is an hour away, beyond the 30 seconds of allowed skew.
+  http:
+    credential: not_yet_valid
+    expect_status: 401
+- id: af-003-wrong-audience
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A token minted for a different MCP server. Accepting it would make every resource sharing
+    an issuer interchangeable.
+  http:
+    credential: wrong_audience
+    expect_status: 401
+- id: af-004-wrong-issuer
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A token from an issuer this gateway does not know.
+  http:
+    credential: wrong_issuer
+    expect_status: 401
+- id: af-005-signed-by-a-stranger
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: Right algorithm, right kid, signed with a key the gateway never issued.
+  http:
+    credential: signed_by_a_stranger
+    expect_status: 401
+- id: af-006-unknown-kid
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A valid signature re-labelled with a kid the gateway has never seen.
+  http:
+    credential: unknown_kid
+    expect_status: 401
+- id: af-007-alg-none
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: 'The oldest JWT attack: claim there is no signature and hope nobody checks.'
+  http:
+    credential: alg_none
+    expect_status: 401
+- id: af-008-alg-confusion-hs256
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: HS256 signed with the published public key. If this were accepted, anyone who read
+    /.well-known/jwks.json could mint an admin token.
+  http:
+    credential: alg_confusion_hs256
+    expect_status: 401
+- id: af-009-unsigned-payload-swap
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A genuine reader token whose payload has been edited to claim the admin role, keeping
+    the original signature.
+  http:
+    credential: unsigned_payload_swap
+    expect_status: 401
+- id: af-010-missing-claims
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A token with no iss, aud, nbf or jti.
+  http:
+    credential: missing_claims
+    expect_status: 401
+- id: af-011-invented-api-key
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A credential of the right shape that was never issued.
+  http:
+    credential: invented_api_key
+    expect_status: 401
+- id: af-012-truncated-api-key
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A wdn_ key too short to be real, probing for a prefix-only comparison.
+  http:
+    credential: truncated_api_key
+    expect_status: 401
+- id: af-013-not-a-credential
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: A password, as if the endpoint took basic auth.
+  http:
+    credential: not_a_credential
+    expect_status: 401
+- id: af-014-empty
+  category: auth_forgery
+  attack: true
+  kind: http
+  description: An Authorization header with nothing after Bearer.
+  http:
+    credential: empty
+    expect_status: 401
+- id: af-900-a-genuine-token-passes-authentication
+  category: auth_forgery
+  attack: false
+  kind: http
+  description: 'The negative case: fourteen rejections prove nothing if the gateway rejects everything.
+    A genuine token must get past authentication - which is what 400 rather than 401 shows. The probe
+    posts a bare tools/list with no MCP handshake, so the transport then refuses it for not being
+    an initialised session; that refusal is the MCP layer''s, and it is only reachable once the credential
+    has been accepted.'
+  http:
+    credential: valid
+    expect_status: 400
