@@ -237,7 +237,7 @@ def make_protected_resource_metadata(
                 "bearer_methods_supported": ["header"],
                 "jwks_uri": f"{settings.jwt_issuer.rstrip('/')}{JWKS_PATH}",
                 "scopes_supported": [],
-                "resource_documentation": "https://github.com/your-handle/mcp-warden",
+                "resource_documentation": "https://github.com/tarun0648/mcp-warden",
             },
             headers={"Cache-Control": "public, max-age=300"},
         )

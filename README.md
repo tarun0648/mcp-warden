@@ -80,7 +80,7 @@ together with the rule that decided it and a request id you can look up in the a
 Needs Docker and Node.js. On a fresh Mac:
 
 ```bash
-git clone <this-repository-url> mcp-warden && cd mcp-warden
+git clone https://github.com/tarun0648/mcp-warden.git && cd mcp-warden
 ```
 
 ```bash
