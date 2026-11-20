@@ -277,9 +277,25 @@ async def test_health_dict_is_serialisable() -> None:
 # -- what a stdio upstream's process environment contains ---------------------------------------
 
 
+@pytest.fixture
+def clean_launcher_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    """Start from an environment with none of the forwarded launcher settings.
+
+    The tests below assert an exact environment, and the machine running them may already set
+    some of these: GitHub's setup-uv action exports UV_CACHE_DIR, which the gateway then
+    rightly forwards. Without this, the assertions measured the CI runner, not the code.
+    """
+    from warden.upstream.manager import LAUNCHER_ENV_VARS
+
+    for name in LAUNCHER_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    return monkeypatch
+
+
 def test_launcher_settings_are_forwarded_to_a_stdio_upstream(
-    monkeypatch: pytest.MonkeyPatch,
+    clean_launcher_env: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch = clean_launcher_env
     from warden.config import StdioTransport
     from warden.upstream.manager import stdio_env
 
@@ -319,8 +335,9 @@ def test_the_allowlist_names_variables_not_a_prefix() -> None:
 
 
 def test_an_upstreams_own_env_wins_over_a_forwarded_value(
-    monkeypatch: pytest.MonkeyPatch,
+    clean_launcher_env: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch = clean_launcher_env
     from warden.config import StdioTransport
     from warden.upstream.manager import stdio_env
 
@@ -330,11 +347,25 @@ def test_an_upstreams_own_env_wins_over_a_forwarded_value(
 
 
 def test_with_nothing_to_forward_the_upstream_gets_only_its_own_env(
-    monkeypatch: pytest.MonkeyPatch,
+    clean_launcher_env: pytest.MonkeyPatch,
 ) -> None:
     from warden.config import StdioTransport
-    from warden.upstream.manager import LAUNCHER_ENV_VARS, stdio_env
+    from warden.upstream.manager import stdio_env
 
-    for name in LAUNCHER_ENV_VARS:
-        monkeypatch.delenv(name, raising=False)
     assert stdio_env(StdioTransport(command="python")) == {}
+
+
+def test_a_launcher_setting_the_host_already_has_is_forwarded(
+    clean_launcher_env: pytest.MonkeyPatch,
+) -> None:
+    """The situation CI is in: UV_CACHE_DIR set by the environment, not by the test.
+
+    Forwarding it is correct - it is on the allowlist - so this is asserted rather than
+    worked around.
+    """
+    from warden.config import StdioTransport
+    from warden.upstream.manager import stdio_env
+
+    clean_launcher_env.setenv("UV_CACHE_DIR", "/home/runner/work/_temp/setup-uv-cache")
+    env = stdio_env(StdioTransport(command="uv", env={"X": "y"}))
+    assert env == {"UV_CACHE_DIR": "/home/runner/work/_temp/setup-uv-cache", "X": "y"}

@@ -12,7 +12,9 @@ keys/
 sandbox/
 *.sqlite3
 *.db
-data/
+# Anchored: the gateway's local state lives in ./data. Unanchored, this also hid tests/data,
+# the labelled scanner dataset, and CI failed on the missing files.
+/data/
 dist/
 build/
 *.egg-info/
