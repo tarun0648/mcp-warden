@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Sign in - mcp-warden</title>
+  {% include "_head.html" %}
+</head>
+<body class="login-body">
+  <main class="card login">
+    <div class="brand"><span class="mark"></span>mcp-warden</div>
+    <h1>Sign in to the console</h1>
+    <p class="muted">Use your API key. You will see what your key's roles allow: admins manage the
+      gateway, everyone can try their own tools and see their own activity.</p>
+    {% if error %}<p class="notice bad" role="alert">{{ error }}</p>{% endif %}
+    <form method="post" action="{{ prefix }}/login">
+      <label class="field">
+        <span>API key</span>
+        <input type="password" name="api_key" autocomplete="off" required placeholder="wdn_..." autofocus>
+      </label>
+      <button class="btn primary wide" type="submit">Sign in</button>
+    </form>
+    <p class="faint small">The key is exchanged for a session cookie and is not kept in the page.
+      Create one with <code>warden keys create --user you --roles editor</code>.</p>
+  </main>
+</body>
+</html>

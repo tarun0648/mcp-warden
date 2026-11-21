@@ -190,6 +190,21 @@ E = elevation of privilege.
 | I | Arguments or credentials in spans or metric labels | span attribute allow-list; no principal label | `tests/unit/test_telemetry.py::test_no_argument_or_credential_ever_reaches_a_span`, `tests/unit/test_telemetry.py::test_no_metric_is_labelled_by_principal` |
 | D | An attacker invents tool names to explode metric cardinality | unknown tools collapse to one label | `tests/integration/test_gateway_telemetry.py::test_an_invented_tool_name_does_not_create_a_time_series` |
 
+### Console
+
+| | Threat | Mitigation | Proof |
+| --- | --- | --- | --- |
+| E | A non-admin opens an admin page or posts an admin action by URL | a guard per route checks the role on the server; 403, nothing changed | `tests/integration/test_console.py::test_admin_pages_refuse_other_roles_on_the_server`, `tests/integration/test_console.py::test_admin_actions_refuse_other_roles_and_change_nothing` |
+| I | A non-admin reads someone else's audit rows by editing the URL | the principal filter is forced on the server for non-admins, in the page, the detail view and the CSV | `tests/integration/test_console.py::test_a_reader_sees_only_their_own_audit_rows_whatever_the_url_says` |
+| E | A user runs playground calls as a role they do not hold | the role is checked against the session before the pipeline runs | `tests/integration/test_console.py::test_a_role_you_do_not_hold_is_refused_before_the_pipeline` |
+| S | CSRF against a console action | `SameSite=Strict` session cookie plus a session-bound token on every POST | `tests/integration/test_console.py::test_a_post_without_the_csrf_token_is_refused`, `tests/integration/test_console.py::test_another_sessions_csrf_token_does_not_work`, `tests/unit/test_console.py::test_every_form_that_posts_carries_the_csrf_token` |
+| T | Stored XSS through a tool name, description or argument | autoescape, no `|safe`, invisible characters made visible, strict CSP | `tests/integration/test_console.py::test_a_hostile_tool_name_is_escaped_everywhere_it_is_shown`, `tests/unit/test_console.py::test_no_console_template_has_inline_style_script_or_handlers` |
+| I | The sign-in key ends up in a page | exchanged once for a cookie; never rendered | `tests/integration/test_console.py::test_the_key_never_appears_in_any_page` |
+| I | A newly created key is shown again later | shown in the create response only; `Cache-Control: no-store` | `tests/integration/test_console.py::test_a_key_is_created_shown_once_works_and_can_be_revoked` |
+| R | A call made from the console looks like a client's | audited with `auth_method=console` and the admin's own user id | `tests/integration/test_console.py::test_playground_calls_are_audited_as_console_calls` |
+| E | An admin approves their own playground call | no approve control for the requester; the store refuses it anyway | `tests/integration/test_console.py::test_the_requester_is_not_offered_a_way_to_approve_their_own_call` |
+| I | One user reads another's playground result | jobs are keyed to the user who started them | `tests/integration/test_console.py::test_jobs_belong_to_the_user_who_started_them` |
+
 ### Build and supply chain
 
 | | Threat | Mitigation | Proof |
@@ -253,5 +268,8 @@ Stated rather than implied. Each is a real limit of v0.1.0, not a hypothetical.
   long conversation, each call individually innocuous, would pass.
 - **A compromised gateway.** Everything above assumes the gateway's process and keys are
   intact. The audit log is tamper-*evident*, not tamper-proof.
+- **A console session outlives its key's revocation.** Sessions are checked at sign-in and
+  last up to eight hours; revoking the key stops its API use at once but not an open console
+  session. Restarting the gateway ends every session. The approval page behaves the same way.
 - **TLS.** Assumed to be terminated in front of the gateway. Compose publishes plain HTTP on
   loopback only.

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Tools{% endblock %}
+{% block heading %}Tools{% endblock %}
+{% block sub %}Every tool definition the gateway has seen, pinned by hash. A changed or poisoned
+  definition is quarantined: hidden from tools/list and refused until an admin approves it.{% endblock %}
+{% block actions %}
+  <form method="post" action="{{ prefix }}/tools/refresh" class="inline">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button class="btn" type="submit">Re-fetch listings</button>
+  </form>
+{% endblock %}
+{% block body %}
+<nav class="tabs" aria-label="Filter">
+  <a href="{{ prefix }}/tools" class="{{ 'active' if not status_filter else '' }}">All</a>
+  <a href="{{ prefix }}/tools?status=quarantined" class="{{ 'active' if status_filter == 'quarantined' else '' }}">Quarantined</a>
+  <a href="{{ prefix }}/tools?status=pinned" class="{{ 'active' if status_filter == 'pinned' else '' }}">Pinned</a>
+</nav>
+<div class="card flush">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Tool</th><th>Status</th><th>Why</th><th>Scan</th><th>Risk</th><th>Server</th><th>Approved by</th><th></th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="mono ident"><a href="{{ prefix }}/tools/{{ row.name|urlencode }}">{{ row.name }}</a>
+            {% if not row.exposed %}<div class="faint small">not in the current listing</div>{% endif %}</td>
+          <td><span class="badge {{ row.status|tone }}">{{ row.status }}</span></td>
+          <td class="small wrap-anywhere">{{ row.reason or '-' }}</td>
+          <td><span class="badge {{ 'bad' if row.verdict == 'malicious' else ('warn' if row.verdict == 'suspicious' else 'neutral') }}">{{ row.verdict }}</span>
+            {% if row.rules %}<div class="chips">{% for rule in row.rules[:4] %}<span class="chip">{{ rule }}</span>{% endfor %}{% if row.rules|length > 4 %}<span class="faint small">+{{ row.rules|length - 4 }}</span>{% endif %}</div>{% endif %}</td>
+          <td>{{ row.risk }}</td>
+          <td class="mono">{{ row.server }} <span class="pill">{{ 'trusted' if row.trusted else 'untrusted' }}</span></td>
+          <td class="mono small">{{ row.approved_by or '-' }}</td>
+          <td><a class="btn small {{ 'primary' if row.status == 'quarantined' else 'ghost' }}" href="{{ prefix }}/tools/{{ row.name|urlencode }}">{{ 'Review' if row.status == 'quarantined' else 'Open' }}</a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8"><div class="empty">No tools here.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

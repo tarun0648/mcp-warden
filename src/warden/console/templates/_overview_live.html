@@ -1,0 +1,120 @@
+<div class="stats">
+  {% if is_admin %}
+    <div class="stat {{ 'ok' if upstreams_up == health|length and health else 'bad' }}">
+      <div class="label">Upstream servers up</div>
+      <div class="value">{{ upstreams_up }}/{{ health|length }}</div>
+      <div class="hint">connected and answering</div>
+    </div>
+    <div class="stat">
+      <div class="label">Tools exposed</div>
+      <div class="value">{{ tool_count }}</div>
+      <div class="hint">across every upstream</div>
+    </div>
+    <div class="stat {{ 'bad' if quarantined else 'ok' }}">
+      <div class="label">Quarantined</div>
+      <div class="value">{{ quarantined }}</div>
+      <div class="hint"><a href="{{ prefix }}/tools?status=quarantined">review</a></div>
+    </div>
+  {% else %}
+    <div class="stat">
+      <div class="label">Tools you can call</div>
+      <div class="value">{{ my_tools|length }}</div>
+      <div class="hint"><a href="{{ prefix }}/playground">open the playground</a></div>
+    </div>
+  {% endif %}
+  <div class="stat {{ 'warn' if pending else '' }}">
+    <div class="label">{{ 'Waiting for approval' if is_admin else 'Your requests waiting' }}</div>
+    <div class="value">{{ pending if pending is not none else '-' }}</div>
+    <div class="hint"><a href="{{ prefix }}/approvals">{{ 'decide' if is_admin else 'see status' }}</a></div>
+  </div>
+  <div class="stat ok">
+    <div class="label">Allowed</div>
+    <div class="value">{{ allowed }}</div>
+    <div class="hint">{% if window %}of the last {{ window }} {{ 'calls' if is_admin else 'of your calls' }}{% else %}no calls yet{% endif %}</div>
+  </div>
+  <div class="stat {{ 'bad' if denied else '' }}">
+    <div class="label">Refused</div>
+    <div class="value">{{ denied }}</div>
+    <div class="hint">denied or held by the gateway</div>
+  </div>
+</div>
+
+<div class="grid sidecar">
+  <div class="card flush">
+    <div class="card-head">
+      <h2>Recent decisions</h2>
+      <a class="small" href="{{ prefix }}/audit">Full activity</a>
+    </div>
+    {% if activity %}
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>When</th>{% if is_admin %}<th>Who</th>{% endif %}<th>Tool</th><th>Decision</th><th>Reason</th>
+        </tr></thead>
+        <tbody>
+        {% for row in activity %}
+          <tr>
+            <td class="nowrap faint">{{ row.ts|ago }}</td>
+            {% if is_admin %}<td class="mono wrap-anywhere">{{ row.principal_id or '-' }}</td>{% endif %}
+            <td class="mono ident">{{ row.tool or '-' }}</td>
+            <td><span class="badge {{ row.decision|tone }}">{{ row.decision }}</span></td>
+            <td class="mono small ident">{{ row.reason_code }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty">No calls yet. <a href="{{ prefix }}/playground">Make one in the playground.</a></div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Outcomes</h2><span class="hint">last {{ window }}</span></div>
+    {% if by_reason %}
+    <div class="bars">
+      {% for code, count in by_reason %}
+      <div class="bar-row">
+        <span class="code-label">{{ code }}</span>
+        <span class="count">{{ count }}</span>
+        <progress class="{{ code|tone }}" value="{{ count }}" max="{{ window }}">{{ count }}</progress>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+      <div class="empty">Nothing to summarise yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% if is_admin %}
+<div class="card flush">
+  <div class="card-head"><h2>Upstream servers</h2><span class="hint">probed with tools/list</span></div>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Server</th><th>State</th><th class="num">Tools</th><th>Last error</th></tr></thead>
+      <tbody>
+      {% for server in health %}
+        <tr>
+          <td class="mono">{{ server.name }}</td>
+          <td><span class="badge {{ server.state|tone }}">{{ server.state }}</span></td>
+          <td class="num">{{ server.tool_count }}</td>
+          <td class="small muted wrap-anywhere">{{ server.last_error or '-' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No upstreams configured.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-head"><h2>Tools you can call</h2><span class="hint">filtered by your role and by quarantine</span></div>
+  {% if my_tools %}
+    <div class="chips">{% for name in my_tools %}<a class="chip" href="{{ prefix }}/playground?tool={{ name|urlencode }}">{{ name }}</a>{% endfor %}</div>
+  {% else %}
+    <div class="empty">Your role cannot see any tools.</div>
+  {% endif %}
+</div>
+{% endif %}

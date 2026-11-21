@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Approvals{% endblock %}
+{% block heading %}{{ 'Approvals' if is_admin else 'Your requests' }}{% endblock %}
+{% block sub %}
+  {% if is_admin %}Destructive calls wait here for a person. An approval works once, for exactly those
+    arguments and that caller, and nobody can approve their own call.
+  {% else %}Your calls that need an administrator's approval, and how they were decided. Once one is
+    approved, run the same call again with the same arguments.{% endif %}
+{% endblock %}
+{% block actions %}
+  <button class="btn" hx-get="{{ prefix }}/fragments/approvals" hx-target="#queue" hx-swap="innerHTML">
+    <span class="spinner htmx-indicator"></span>Refresh
+  </button>
+{% endblock %}
+{% block body %}
+<div id="queue">{% include "_approval_queue.html" %}</div>
+{% endblock %}

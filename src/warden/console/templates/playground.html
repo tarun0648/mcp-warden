@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Playground{% endblock %}
+{% block heading %}Playground{% endblock %}
+{% block sub %}Run a real call through the full gateway and see exactly what it decides. Calls are
+  audited, rate-limited and, for destructive tools, wait for an approval like any other.{% endblock %}
+{% block body %}
+{% if not available %}
+  <p class="notice bad">The MCP endpoint is not mounted on this gateway, so there is no pipeline to run calls through.</p>
+{% endif %}
+<div class="grid split">
+  <div>
+    <div class="card">
+      <div class="card-head"><h2>1. Act as</h2>
+        <span class="hint">{{ 'Admins can try any role' if is_admin else 'Your roles' }}</span></div>
+      <form method="get" action="{{ prefix }}/playground" class="inline"
+            hx-get="{{ prefix }}/playground" hx-trigger="change" hx-select=".shell" hx-target=".shell"
+            hx-swap="outerHTML" hx-push-url="true">
+        <select name="role" aria-label="Role">
+          {% for option in play_roles %}
+            <option value="{{ option }}" {% if option == role %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button class="btn small" type="submit">Switch</button></noscript>
+      </form>
+      <p class="small muted">As <span class="pill">{{ role }}</span> the gateway shows {{ visible|length }}
+        tool{{ '' if visible|length == 1 else 's' }}. Everything else is hidden from this role's
+        <code>tools/list</code>{% if is_admin %} - you can still call it here, to watch it be refused{% endif %}.</p>
+    </div>
+
+    <form class="card" hx-post="{{ prefix }}/playground/run" hx-target="#result" hx-swap="innerHTML">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <input type="hidden" name="role" value="{{ role }}">
+      <div class="card-head"><h2>2. Call a tool</h2></div>
+      <label class="field">
+        <span>Tool</span>
+        <select name="tool" hx-get="{{ prefix }}/fragments/playground/tool" hx-trigger="change"
+                hx-target="#schema" hx-swap="innerHTML">
+          {% if is_admin %}
+            <optgroup label="Visible to {{ role }}">
+              {% for name in tool_choices if name in visible %}
+                <option value="{{ name }}" {% if name == chosen %}selected{% endif %}>{{ name }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Hidden from {{ role }} (will be refused)">
+              {% for name in tool_choices if name not in visible %}
+                <option value="{{ name }}" {% if name == chosen %}selected{% endif %}>{{ name }}</option>
+              {% endfor %}
+            </optgroup>
+          {% else %}
+            {% for name in tool_choices %}
+              <option value="{{ name }}" {% if name == chosen %}selected{% endif %}>{{ name }}</option>
+            {% else %}
+              <option value="">No tools visible to this role</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+      </label>
+      <div id="schema">{% include "_tool_schema.html" %}</div>
+      <div class="row">
+        <button class="btn primary" type="submit" {% if not available %}disabled{% endif %}>
+          <span class="spinner htmx-indicator"></span>Run through the gateway
+        </button>
+        <span class="faint small">Runs for real. Destructive tools wait for another admin's approval.</span>
+      </div>
+    </form>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-head"><h2>3. What the gateway decided</h2></div>
+      <div id="result">
+        <div class="empty">Run a call to see the decision, the reason, every stage it passed and the response.</div>
+      </div>
+    </div>
+    {% if jobs %}
+    <div class="card flush">
+      <div class="card-head"><h2>Your recent calls</h2><span class="hint">this session</span></div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Tool</th><th>As</th><th>Outcome</th><th></th></tr></thead>
+          <tbody>
+          {% for job in jobs %}
+            <tr>
+              <td class="mono ident">{{ job.tool }}</td>
+              <td><span class="pill">{{ job.role }}</span></td>
+              <td>
+                {% if job.done %}
+                  <span class="badge {{ job.outcome.reason_code|tone }}">{{ job.outcome.reason_code }}</span>
+                {% else %}<span class="badge warn">running</span>{% endif %}
+              </td>
+              <td><button class="btn small ghost" hx-get="{{ prefix }}/fragments/jobs/{{ job.id }}"
+                          hx-target="#result" hx-swap="innerHTML">Show</button></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

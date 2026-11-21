@@ -27,6 +27,7 @@ gateway's upstream liveness probe is `tools/list`, not `ping`. Pinging a modern 
 | Component | File | Job |
 | --- | --- | --- |
 | App factory | `src/warden/main.py` | Builds the Starlette app: `/mcp`, `/healthz`, `/readyz`, the JWKS and RFC 9728 metadata documents, `/metrics`, the admin API and the approval UI |
+| Console | `src/warden/console/` | The web UI at `/console`: role-aware pages and a playground that runs calls through the same pipeline factory as `/mcp` |
 | HTTP edge | `src/warden/http_limits.py` | Request body limit (413) and JSON-RPC batch refusal, before anything parses the body |
 | MCP server | `src/warden/proxy/server.py` | The low-level `Server` with `on_list_tools` / `on_call_tool`; turns MCP requests into pipeline runs |
 | Pipeline | `src/warden/pipeline.py` | `RequestContext`, the `Stage` protocol, and the runner that orders stages, times them and always runs the finish hooks |
@@ -198,3 +199,19 @@ Liveness says nothing about upstreams. The first containerised run was healthy w
 upstreams down (see the Phase 13 entry in `docs/decisions.md`); `warden tools list` or an
 actual MCP session is the check that the gateway can do its job.
 
+## The console
+
+`/console` is server-rendered (Jinja2 + HTMX, no JavaScript of our own) and shares the approval
+page's security model: an API key is exchanged once for an `HttpOnly`, `SameSite=Strict`
+session cookie scoped to `/console`, every POST carries a session-bound CSRF token, and the CSP
+allows one pinned, integrity-checked script and no inline script or style.
+
+Every route is wrapped in exactly one guard - `page`, `fragment` or `action` - each taking an
+`admin` flag. The navigation hides admin sections from other roles, but the guard is what
+enforces it; data a non-admin may see is narrowed on the server too (their audit query is
+forced to their own principal id).
+
+The playground builds the same `RequestContext` that `on_call_tool` builds and runs it through
+the same `pipeline_factory`, which `create_app` now builds once and hands to both. Calls run as
+background tasks so a page can poll a call that is waiting up to `approval.wait_seconds` for a
+human.

@@ -1,0 +1,14 @@
+{% if result.ok %}
+  <p class="notice ok">Chain intact: {{ result.rows_checked }} rows verified.</p>
+  <dl class="kv"><dt>Head hash</dt><dd class="mono small">{{ result.head_hash }}</dd></dl>
+  <p class="faint small">Pin this hash somewhere the gateway cannot write: it detects a wholesale rebuild of the log.</p>
+{% else %}
+  <p class="notice bad">Chain broken after {{ result.rows_checked }} rows.</p>
+  {% if result.first_break %}
+  <dl class="kv">
+    <dt>First bad row</dt><dd class="mono">{{ result.first_break.row_id }}</dd>
+    <dt>Kind</dt><dd>{{ result.first_break.kind }}</dd>
+    <dt>Detail</dt><dd>{{ result.first_break.detail }}</dd>
+  </dl>
+  {% endif %}
+{% endif %}

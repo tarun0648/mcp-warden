@@ -70,6 +70,9 @@ together with the rule that decided it and a request id you can look up in the a
 - **Audit log** - insert-only, SHA-256 hash-chained, written *before* a call is forwarded; if it
   cannot be written the call does not happen. `warden audit verify` finds any edited, deleted,
   reordered or forged row.
+- **A web console for every role** - at `/console`. Admins manage tools, approvals, keys and
+  policy; everyone can try their own tools in a playground that runs the real pipeline, and
+  see their own activity. Roles are enforced on the server, per route.
 - **Observability** - OpenTelemetry traces per pipeline stage, Prometheus metrics, a Grafana
   dashboard. No arguments or credentials in spans or labels.
 - **Hardened by default** - request body and JSON-RPC batch limits, DNS-rebinding protection,
@@ -109,6 +112,35 @@ npx -y @modelcontextprotocol/inspector --cli http://localhost:8080/mcp --transpo
 
 ```bash
 docker compose exec gateway warden audit tail --limit 5
+```
+
+Or open the console at **http://localhost:8080/console** and sign in with the same key.
+
+## The console
+
+A web UI served by the gateway itself. Sign in with any API key; what you see depends on its
+roles, and the server checks the role again on every page and action rather than just hiding
+links.
+
+| Page | admin | any other role |
+| --- | --- | --- |
+| Overview | upstream health, tools, quarantine, approvals, every decision | your tools, your decisions, your pending requests |
+| Playground | call any tool as any role | call tools as one of your own roles |
+| Activity | the full audit log, filters, chain verification, CSV | your own audit rows only |
+| Approvals | the queue: approve or deny | your own requests and how they were decided |
+| Tools | pins, diffs and scanner findings; approve or quarantine | - |
+| API keys | create (the secret is shown once), revoke | - |
+| Policy | every rule and constraint, what each role sees, reload | - |
+
+The playground is not a lookalike: a call made there goes through the same pipeline instance as
+an MCP client's, so it is policy-checked, rate-limited, scanned, held for approval and audited
+the same way, with `auth_method=console` in the audit row. A destructive call waits for a
+*different* admin, as any other would.
+
+Created a key in the quickstart? Make an admin one to see everything:
+
+```bash
+docker compose exec gateway warden keys create --user you --roles admin
 ```
 
 Connecting Cursor, Claude Desktop or the Inspector's web UI - including what does *not* work -

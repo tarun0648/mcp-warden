@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}API keys{% endblock %}
+{% block heading %}API keys{% endblock %}
+{% block sub %}Keys are stored as a hash; the secret is shown once, when it is created. Revoking
+  takes effect on the key's next use, with no restart.{% endblock %}
+{% block body %}
+{% if created %}
+<div class="card">
+  <div class="card-head"><h2>New key for <span class="mono">{{ created.user_id }}</span></h2>
+    <span class="hint">{% for role in created.roles %}<span class="pill">{{ role }}</span>{% endfor %}</span></div>
+  <p class="notice warn">Copy it now. It will not be shown again, and it cannot be recovered.</p>
+  <div class="secret" aria-label="New API key">{{ created.secret }}</div>
+  <p class="faint small">Send it as <code>Authorization: Bearer &lt;key&gt;</code>, or sign in to this console with it.</p>
+</div>
+{% endif %}
+<div class="grid sidecar">
+  <div class="card flush">
+    <div class="card-head"><h2>Keys</h2><span class="hint">{{ keys|length }} total</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Prefix</th><th>User</th><th>Roles</th><th>Label</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for key in keys %}
+          <tr>
+            <td class="mono">{{ key.prefix }}</td>
+            <td class="mono ident">{{ key.user_id }}</td>
+            <td>{% for role in key.roles %}<span class="pill">{{ role }}</span>{% endfor %}</td>
+            <td class="small wrap-anywhere">{{ key.label or '-' }}</td>
+            <td class="faint nowrap">{{ (key.last_used_at|ago) if key.last_used_at else 'never' }}</td>
+            <td>{% if key.revoked_at %}<span class="badge bad">revoked</span>{% else %}<span class="badge ok">active</span>{% endif %}</td>
+            <td>
+              {% if not key.revoked_at %}
+              <form method="post" action="{{ prefix }}/keys/revoke" class="inline"
+                    hx-confirm="Revoke the key {{ key.prefix }} for {{ key.user_id }}? It stops working immediately.">
+                <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+                <input type="hidden" name="prefix" value="{{ key.prefix }}">
+                <button class="btn small danger" type="submit">Revoke</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7"><div class="empty">No keys yet.</div></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <form class="card" method="post" action="{{ prefix }}/keys/create">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="card-head"><h2>Create a key</h2></div>
+    <label class="field"><span>User id</span>
+      <input type="text" name="user_id" value="{{ form.user_id }}" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9._@\-]{0,63}" placeholder="alice">
+      <span class="hint">Who the key authenticates as. Letters, digits, . _ @ -</span></label>
+    <div class="field"><span>Roles</span>
+      <div class="checks">
+        {% for role in role_choices %}
+          <label><input type="checkbox" name="roles" value="{{ role }}" {% if role in form.roles %}checked{% endif %}>{{ role }}</label>
+        {% endfor %}
+      </div>
+    </div>
+    <label class="field"><span>Label</span>
+      <input type="text" name="label" value="{{ form.label }}" maxlength="120" placeholder="where it is used">
+    </label>
+    <button class="btn primary wide" type="submit">Create key</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A web console at `/console` for every role. Admins get overview, tools (pins, diffs, scanner
+  findings, approve and quarantine), approvals, the full audit log with chain verification and
+  CSV export, API key management and the policy in force with reload. Every other role gets
+  their own overview, a playground limited to their own roles, their own activity and their
+  own approval requests. Roles are enforced per route on the server.
+- The playground runs calls through the same pipeline instance as `/mcp`, so they are decided,
+  rate-limited, held for approval and audited exactly like a client's, marked
+  `auth_method=console`.
+
 ## v0.1.1 - 2026-11-14
 
 ### Fixed

@@ -1,0 +1,28 @@
+<div class="card">
+  <div class="card-head">
+    <h2>Request <span class="mono small">{{ rows[0].request_id }}</span></h2>
+    <span class="hint">{{ rows|length }} row{{ '' if rows|length == 1 else 's' }} - a call writes one before it is forwarded and one after</span>
+  </div>
+  <div class="grid two">
+  {% for row in rows %}
+    <div class="stack">
+      <div class="row"><span class="badge {{ row.event|tone }}">{{ row.event }}</span>
+        <span class="faint small">#{{ row.id }} - {{ row.ts|clock }} UTC</span></div>
+      <dl class="kv">
+        <dt>Principal</dt><dd class="mono">{{ row.principal_id or '-' }} <span class="faint">({{ row.auth_method or '-' }})</span></dd>
+        <dt>Tool</dt><dd class="mono">{{ row.tool or '-' }}{% if row.upstream %} <span class="faint">on {{ row.upstream }}</span>{% endif %}</dd>
+        <dt>Risk</dt><dd>{{ row.risk or '-' }}</dd>
+        <dt>Decision</dt><dd><span class="badge {{ row.decision|tone }}">{{ row.decision }}</span> <span class="mono small">{{ row.reason_code }}</span></dd>
+        <dt>Rule</dt><dd class="mono">{{ row.matched_rule or '-' }}</dd>
+        <dt>Result size</dt><dd>{{ row.result_bytes }} bytes</dd>
+        <dt>Row hash</dt><dd class="mono small">{{ row.row_hash }}</dd>
+        <dt>Links to</dt><dd class="mono small">{{ row.prev_hash }}</dd>
+      </dl>
+      <h3 class="muted small">Arguments, as stored (redacted)</h3>
+      <pre class="code">{{ row.args_redacted|pretty }}</pre>
+      {% if row.stage_timings_ms %}<h3 class="muted small">Stage timings (ms)</h3><pre class="code">{{ row.stage_timings_ms|pretty }}</pre>{% endif %}
+      {% if row.scan_flags %}<h3 class="muted small">Scanner notes</h3><pre class="code">{{ row.scan_flags|pretty }}</pre>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</div>

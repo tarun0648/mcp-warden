@@ -1,0 +1,60 @@
+{% if notice %}<p class="notice {{ notice_tone }}" role="status">{{ notice }}</p>{% endif %}
+<div class="card">
+  <div class="card-head"><h2>Waiting</h2><span class="hint">{{ pending|length }} pending</span></div>
+  {% for item in pending %}
+    <div class="request-card">
+      <div class="top">
+        <div class="row">
+          <span class="mono">{{ item.tool }}</span>
+          <span class="badge {{ 'bad' if item.risk == 'destructive' else 'warn' }}">{{ item.risk }}</span>
+        </div>
+        <span class="faint small">requested {{ item.created_at|ago }} by <span class="mono">{{ item.principal_id }}</span>
+          - expires {{ item.expires_at|ago }}</span>
+      </div>
+      <pre class="code">{{ item.args_redacted|pretty }}</pre>
+      {% if item.scan_flags %}
+        <details><summary class="small">Scanner notes</summary><pre class="code">{{ item.scan_flags|pretty }}</pre></details>
+      {% endif %}
+      {% if is_admin and item.principal_id != user_id %}
+        <form class="inline" hx-post="{{ prefix }}/approvals/decide" hx-target="#queue" hx-swap="innerHTML">
+          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          <input type="hidden" name="approval_id" value="{{ item.id }}">
+          <input type="text" name="reason" placeholder="Reason (optional)" aria-label="Reason" maxlength="200">
+          <button class="btn success" type="submit" name="action" value="approve">Approve</button>
+          <button class="btn danger" type="submit" name="action" value="deny">Deny</button>
+        </form>
+      {% elif is_admin %}
+        <p class="faint small">You requested this call, so another admin has to decide it.</p>
+      {% else %}
+        <p class="faint small">Waiting for an administrator.</p>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="empty">Nothing is waiting.</div>
+  {% endfor %}
+</div>
+
+<div class="card flush">
+  <div class="card-head"><h2>Recently decided</h2></div>
+  {% if recent %}
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Tool</th>{% if is_admin %}<th>Requested by</th>{% endif %}<th>Status</th><th>Decided by</th><th>Reason</th><th>When</th></tr></thead>
+      <tbody>
+      {% for item in recent %}
+        <tr>
+          <td class="mono ident">{{ item.tool }}</td>
+          {% if is_admin %}<td class="mono">{{ item.principal_id }}</td>{% endif %}
+          <td><span class="badge {{ item.status|tone }}">{{ item.status }}</span></td>
+          <td class="mono">{{ item.decided_by or '-' }}</td>
+          <td class="small wrap-anywhere">{{ item.get('decision_reason') or '-' }}</td>
+          <td class="faint nowrap">{{ (item.decided_at or item.created_at)|ago }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty">No decisions yet.</div>
+  {% endif %}
+</div>

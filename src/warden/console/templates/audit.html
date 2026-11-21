@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Activity{% endblock %}
+{% block heading %}{{ 'Audit log' if is_admin else 'Your activity' }}{% endblock %}
+{% block sub %}
+  {% if is_admin %}Every request the gateway handled, allowed or refused, in a hash-chained, append-only log. Arguments are stored redacted.
+  {% else %}Every call you made through the gateway and what it decided. Only your own rows are shown.{% endif %}
+{% endblock %}
+{% block actions %}
+  <a class="btn" href="{{ prefix }}/audit.csv{{ '?' ~ query_string if query_string else '' }}">Export CSV</a>
+  {% if is_admin %}
+  <button class="btn" hx-get="{{ prefix }}/fragments/verify" hx-target="#verify" hx-swap="innerHTML">
+    <span class="spinner htmx-indicator"></span>Verify the chain
+  </button>
+  {% endif %}
+{% endblock %}
+{% block body %}
+{% if is_admin %}<div id="verify"></div>{% endif %}
+<form class="card" method="get" action="{{ prefix }}/audit">
+  <div class="filters">
+    {% if is_admin %}
+    <label class="field"><span>Principal</span><input type="text" name="principal" value="{{ query.principal }}" placeholder="user id"></label>
+    {% endif %}
+    <label class="field"><span>Tool</span><input type="text" name="tool" value="{{ query.tool }}" placeholder="server__tool"></label>
+    <label class="field"><span>Decision</span>
+      <select name="decision"><option value="">any</option>
+        {% for value in decisions %}<option value="{{ value }}" {% if value == query.decision %}selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select></label>
+    <label class="field"><span>Event</span>
+      <select name="event"><option value="">any</option>
+        {% for value in events %}<option value="{{ value }}" {% if value == query.event %}selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select></label>
+    <label class="field"><span>Reason</span>
+      <select name="reason_code"><option value="">any</option>
+        {% for value in reason_codes %}<option value="{{ value }}" {% if value == query.reason_code %}selected{% endif %}>{{ value }}</option>{% endfor %}
+      </select></label>
+    <label class="field"><span>Request id</span><input type="text" name="request_id" value="{{ query.request_id }}"></label>
+    <div class="row">
+      <button class="btn primary" type="submit">Apply</button>
+      <a class="btn ghost" href="{{ prefix }}/audit">Clear</a>
+    </div>
+  </div>
+</form>
+
+<div id="detail"></div>
+
+<div class="card flush">
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr>
+        <th>#</th><th>When (UTC)</th><th>Event</th>{% if is_admin %}<th>Principal</th>{% endif %}
+        <th>Tool</th><th>Decision</th><th>Reason</th><th>Rule</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td class="faint num">{{ row.id }}</td>
+          <td class="nowrap small">{{ row.ts|clock }}</td>
+          <td><span class="badge {{ row.event|tone }}">{{ row.event }}</span></td>
+          {% if is_admin %}<td class="mono small wrap-anywhere">{{ row.principal_id or '-' }}{% if row.auth_method == 'console' %} <span class="pill">console</span>{% endif %}</td>{% endif %}
+          <td class="mono small ident">{{ row.tool or row.method }}</td>
+          <td><span class="badge {{ row.decision|tone }}">{{ row.decision }}</span></td>
+          <td class="mono small ident">{{ row.reason_code }}</td>
+          <td class="mono small wrap-anywhere">{{ row.matched_rule or '-' }}</td>
+          <td><button class="btn small ghost" hx-get="{{ prefix }}/fragments/audit/{{ row.request_id }}"
+                      hx-target="#detail" hx-swap="innerHTML">Details</button></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9"><div class="empty">No rows match.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="row">
+  {% if not first_page %}<a class="btn" href="{{ prefix }}/audit{{ '?' ~ query_string if query_string else '' }}">First page</a>{% endif %}
+  <span class="spacer"></span>
+  {% if next_cursor %}<a class="btn" href="{{ prefix }}/audit?{{ query_string ~ '&' if query_string else '' }}cursor={{ next_cursor }}">Older rows</a>{% endif %}
+</div>
+{% endblock %}

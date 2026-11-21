@@ -1,0 +1,55 @@
+{% if problem %}
+  <p class="notice bad">{{ problem }}</p>
+{% elif job and not job.done %}
+  <div hx-get="{{ prefix }}/fragments/jobs/{{ job.id }}" hx-trigger="every 1s" hx-swap="outerHTML">
+    <div class="outcome warn">
+      <div class="row"><span class="spinner"></span><span class="big">Running</span>
+        <span class="faint">{{ job.elapsed_label }}</span></div>
+      <div class="reason"><span class="mono">{{ job.tool }}</span> as <span class="pill">{{ job.role }}</span></div>
+      {% if job.outcome.get('approval_id') %}
+        <p class="reason">Waiting for approval <span class="mono">{{ job.outcome.get('approval_id', '')[:8] }}</span>.
+          Another admin has to approve it on <a href="{{ prefix }}/approvals">Approvals</a>: nobody may approve their own call.</p>
+      {% endif %}
+    </div>
+  </div>
+{% elif job %}
+  {% set o = job.outcome %}
+  <div class="outcome {{ o.reason_code|tone }}">
+    <div class="big">
+      {% if o.decision == 'allow' %}Allowed{% elif o.decision == 'pending' %}Held for approval{% else %}Refused{% endif %}
+      <span class="badge {{ o.reason_code|tone }}">{{ o.reason_code }}</span>
+    </div>
+    {% if o.reason %}<div class="reason">{{ o.reason }}</div>{% endif %}
+  </div>
+  <dl class="kv">
+    <dt>Tool</dt><dd class="mono">{{ job.tool }}</dd>
+    <dt>As role</dt><dd><span class="pill">{{ job.role }}</span></dd>
+    {% if o.matched_rule %}<dt>Decided by rule</dt><dd class="mono">{{ o.matched_rule }}</dd>{% endif %}
+    <dt>Forwarded upstream</dt><dd>{{ 'yes' if o.forwarded else 'no - it never left the gateway' }}</dd>
+    {% if o.scan_flags.get('defaults_filled') %}<dt>Defaults filled</dt><dd>{% for name in o.scan_flags.get('defaults_filled', []) %}<span class="chip">{{ name }}</span>{% endfor %}</dd>{% endif %}
+    <dt>Request id</dt><dd><a class="mono small" href="{{ prefix }}/audit?request_id={{ o.request_id }}">{{ o.request_id }}</a></dd>
+    <dt>Took</dt><dd>{{ job.elapsed_label }}</dd>
+  </dl>
+  {% if o.stage_timings_ms %}
+  <h3 class="muted small">Stages it passed, in order</h3>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Stage</th><th class="num">ms</th></tr></thead>
+      <tbody>
+      {% for stage, ms in o.stage_timings_ms.items() %}
+        <tr><td class="mono">{{ stage }}</td><td class="num">{{ '%.2f'|format(ms) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <h3 class="muted small">What the client receives</h3>
+  <pre class="code">{{ o.text|visible(4000) or '(empty)' }}</pre>
+  {% if o.structured %}
+    <details><summary class="small">Structured content</summary><pre class="code">{{ o.structured|pretty }}</pre></details>
+  {% endif %}
+  {% if o.scan_flags %}
+    <details><summary class="small">Scanner notes</summary><pre class="code">{{ o.scan_flags|pretty }}</pre></details>
+  {% endif %}
+  {% if o.error %}<p class="notice bad">{{ o.error }}</p>{% endif %}
+{% endif %}

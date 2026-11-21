@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>{% block title %}Console{% endblock %} - mcp-warden</title>
+  {% include "_head.html" %}
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="{{ prefix }}"><span class="mark"></span>mcp-warden</a>
+    <nav class="nav" aria-label="Console">
+      {% for key, label, href, admin_only in nav %}
+        {% if admin_only and loop.previtem is defined and not loop.previtem[3] %}
+          {% if is_admin %}<div class="section">Administration</div>{% endif %}
+        {% endif %}
+        {% if is_admin or not admin_only %}
+          <a href="{{ href }}" class="{{ 'active' if active == key else '' }}"
+             {% if active == key %}aria-current="page"{% endif %}>{{ label }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+    <div class="who">
+      <div class="user mono">{{ user_id }}</div>
+      <div class="chips">{% for role in roles %}<span class="pill">{{ role }}</span>{% endfor %}</div>
+      <form method="post" action="{{ prefix }}/logout" class="inline">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button class="btn ghost small" type="submit">Sign out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="main" id="main">
+    <header class="page-head">
+      <div>
+        <h1>{% block heading %}{% endblock %}</h1>
+        <p class="sub">{% block sub %}{% endblock %}</p>
+      </div>
+      <div class="head-actions">{% block actions %}{% endblock %}</div>
+    </header>
+    {% if notice %}<p class="notice {{ notice_tone }}" role="status">{{ notice }}</p>{% endif %}
+    {% block body %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

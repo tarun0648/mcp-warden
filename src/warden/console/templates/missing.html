@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Not found{% endblock %}
+{% block heading %}Not found{% endblock %}
+{% block body %}
+<div class="card"><p><span class="mono">{{ what }}</span> does not exist.</p>
+  <p><a href="{{ prefix }}/tools">Back to tools</a></p></div>
+{% endblock %}

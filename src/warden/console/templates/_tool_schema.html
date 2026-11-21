@@ -1,0 +1,21 @@
+{% if schema %}
+  <div class="field">
+    <span>Description <span class="faint">(as the upstream wrote it; invisible characters shown)</span></span>
+    <pre class="code">{{ schema.description|visible(800) or '(none)' }}</pre>
+  </div>
+  <details class="field">
+    <summary class="small">Input schema{% if schema.required %} - required: {{ schema.required|join(', ') }}{% endif %}</summary>
+    <pre class="code">{{ schema.schema|pretty }}</pre>
+  </details>
+  <label class="field">
+    <span>Arguments (JSON object)</span>
+    <textarea name="arguments" spellcheck="false">{{ schema.suggested }}</textarea>
+    <span class="hint">Pre-filled from the schema's defaults. Try a path like <code>../../etc/passwd</code> to watch the policy refuse it.</span>
+  </label>
+{% else %}
+  <label class="field">
+    <span>Arguments (JSON object)</span>
+    <textarea name="arguments" spellcheck="false">{}</textarea>
+    <span class="hint">That tool is not in the registry, so the gateway will refuse the call - which is worth seeing too.</span>
+  </label>
+{% endif %}

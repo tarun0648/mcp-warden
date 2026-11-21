@@ -814,3 +814,44 @@ went from 120 refusals of that call to 120 allowed.
 
 **Release bookkeeping.** v0.1.0 was already tagged, so this shipped as v0.1.1, and the v0.1.0 section's results block is frozen at the figures it was released
 with; `make readme-results` now regenerates only the README.
+
+## The console: one UI for every role
+
+**Same stack as the approval page, on purpose.** Server-rendered Jinja + HTMX with no
+JavaScript of our own, because the page renders attacker-controlled text (tool names,
+descriptions, arguments, audit fields) and the cheapest way to make an XSS harmless is to have
+a CSP that allows one pinned, integrity-checked script and nothing inline. Every template is
+checked by a test for inline script, inline style, event-handler attributes and `|safe`, and
+every POST form for the CSRF field.
+
+**Every role, not just admins.** Anyone with a key can sign in. Admins get everything; any
+other role gets their own overview, a playground limited to their own roles, their own audit
+rows and their own approval requests. The rule that made this safe to build: **the server
+decides, per route.** Every handler goes through exactly one guard (`page`, `fragment`,
+`action`) with an `admin` flag; hiding a nav link is presentation, not control. Where a
+non-admin may see a page, the data is narrowed on the server as well - their audit query is
+forced to their own principal id, so `?principal=someone-else` changes nothing. A test that
+removed the guard from the keys page was run to confirm the role tests fail without it.
+
+**The playground is the real pipeline.** It would have been easy to fake - call the upstream
+and show the result - and worthless: the point of the page is to show what the gateway does.
+`create_app` now builds the pipeline factory once and hands the same instance to `/mcp` and to
+the console, and a console call builds the same `RequestContext` an MCP call does. Its
+principal carries `auth_method="console"` and the signed-in user's id, so the audit log never
+mistakes it for a client. Acting as another role is admin-only and grants nothing an admin
+lacks: they can already mint a key for any role.
+
+**Calls run as background jobs** because a destructive call can wait up to
+`approval.wait_seconds` for a human; the page polls rather than holding a request open. Jobs
+are keyed to the user who started them, bounded, and a running job is never evicted.
+
+**Things found while building it:** `excerpt`, used for one-line log evidence, collapses
+newlines, which would have flattened every JSON block and description, so the console has its
+own variant that keeps line breaks and still exposes invisible characters. A template variable
+named `status` collided with `render()`'s HTTP-status argument and the policy page silently
+received nothing. And the project's own source-hygiene test caught literal zero-width
+characters in the console's unit test, which were rewritten as escapes.
+
+**Known gap:** a console session is checked at sign-in and lasts up to eight hours, so revoking
+a key ends its API use at once but not an open console session. The approval page has always
+behaved the same way; recorded in the threat model.

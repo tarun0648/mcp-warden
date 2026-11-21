@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Admins only{% endblock %}
+{% block heading %}Admins only{% endblock %}
+{% block sub %}This page needs the admin role.{% endblock %}
+{% block body %}
+<div class="card">
+  <p>You are signed in as <span class="mono">{{ user_id }}</span> with
+    {% for role in roles %}<span class="pill">{{ role }}</span>{% endfor %}.</p>
+  <p class="muted">Ask an administrator if you need access. Meanwhile, the
+    <a href="{{ prefix }}/playground">Playground</a> shows the tools you can call, and
+    <a href="{{ prefix }}/audit">Activity</a> shows what you have done.</p>
+</div>
+{% endblock %}

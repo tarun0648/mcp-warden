@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ pin.name }}{% endblock %}
+{% block heading %}<span class="mono">{{ pin.name }}</span>{% endblock %}
+{% block sub %}<span class="badge {{ pin.status|tone }}">{{ pin.status }}</span>
+  {% if pin.reason %}- {{ pin.reason }}{% endif %}{% endblock %}
+{% block actions %}<a class="btn ghost" href="{{ prefix }}/tools">All tools</a>{% endblock %}
+{% block body %}
+<div class="grid sidecar">
+  <div>
+    {% if diff %}
+    <div class="card">
+      <div class="card-head"><h2>What changed since it was approved</h2><span class="hint">- approved  + current</span></div>
+      <div class="diff">
+        {% for line in diff %}
+          <div class="{{ 'del' if line.startswith('  - ') else ('add' if line.startswith('  + ') else 'key') }}">{{ line|visible(800) }}</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="card">
+      <div class="card-head"><h2>Scanner findings</h2>
+        <span class="hint">verdict <span class="badge {{ 'bad' if verdict == 'malicious' else ('warn' if verdict == 'suspicious' else 'neutral') }}">{{ verdict }}</span>{% if score is not none %} - score {{ score }}{% endif %}</span></div>
+      {% if findings %}
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>Rule</th><th>Severity</th><th>Where</th><th>Evidence</th></tr></thead>
+          <tbody>
+          {% for finding in findings %}
+            <tr>
+              <td class="mono small">{{ finding.rule }}</td>
+              <td><span class="badge {{ 'bad' if finding.severity in ('high', 'critical') else 'warn' }}">{{ finding.severity }}</span></td>
+              <td class="mono small">{{ finding.where or '-' }}</td>
+              <td class="small wrap-anywhere">{{ finding.evidence|visible(300) }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<div class="empty">No findings: the definition looks clean.</div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Current definition</h2><span class="hint">as the upstream sends it, renamed</span></div>
+      {% if definition %}<pre class="code tall">{{ definition|pretty|visible(20000) }}</pre>
+      {% else %}<div class="empty">This tool is not in the current listing.</div>{% endif %}
+    </div>
+  </div>
+  <div>
+    <div class="card">
+      <div class="card-head"><h2>Decision</h2></div>
+      {% if pin.status == 'quarantined' %}
+        <p class="small">Approving pins the <strong>current</strong> definition. Read the diff and findings first: for a poisoned tool, the description is the attack.</p>
+        <form method="post" action="{{ prefix }}/tools/{{ pin.name|urlencode }}/approve">
+          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          <button class="btn success wide" type="submit">Approve and pin this definition</button>
+        </form>
+      {% else %}
+        <p class="small">Quarantining hides the tool from every role and refuses calls to it until an admin approves it again.</p>
+        <form method="post" action="{{ prefix }}/tools/{{ pin.name|urlencode }}/quarantine">
+          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          <label class="field"><span>Reason</span><input type="text" name="reason" maxlength="200" placeholder="why"></label>
+          <button class="btn danger wide" type="submit">Quarantine</button>
+        </form>
+      {% endif %}
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Pin</h2></div>
+      <dl class="kv">
+        <dt>Server</dt><dd class="mono">{{ pin.server }}</dd>
+        <dt>SHA-256</dt><dd class="mono small">{{ pin.sha256 }}</dd>
+        <dt>First seen</dt><dd>{{ pin.first_seen_at|ago }}</dd>
+        <dt>Updated</dt><dd>{{ pin.updated_at|ago }}</dd>
+        <dt>Approved by</dt><dd class="mono">{{ pin.approved_by or '-' }}</dd>
+        {% if pin.approved_at %}<dt>Approved</dt><dd>{{ pin.approved_at|ago }}</dd>{% endif %}
+      </dl>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{# htmx may not inject styles (the CSP forbids inline style) or evaluate code from attributes
+   or swapped-in <script> tags: every value rendered here comes from an attacker. #}
+<meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false}'>
+<link rel="stylesheet" href="{{ stylesheet }}">
+{# Pinned, integrity-checked, and the only script on the page. #}
+<script src="{{ htmx_url }}"
+        integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+        crossorigin="anonymous" defer></script>

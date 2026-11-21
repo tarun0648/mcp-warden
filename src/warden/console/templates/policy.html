@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Policy{% endblock %}
+{% block heading %}Policy{% endblock %}
+{% block sub %}Deny by default: a role can call only what a rule allows, and a deny rule wins. Edit
+  <code>{{ policy_status.path }}</code>, then reload - a broken file is rejected and the current policy stays in force.{% endblock %}
+{% block actions %}
+  <form method="post" action="{{ prefix }}/policy/reload" class="inline">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button class="btn primary" type="submit">Reload from file</button>
+  </form>
+{% endblock %}
+{% block body %}
+<div class="stats">
+  <div class="stat"><div class="label">Roles</div><div class="value">{{ policy_status.roles|length }}</div></div>
+  <div class="stat"><div class="label">Rules</div><div class="value">{{ policy_status.rule_count }}</div></div>
+  <div class="stat"><div class="label">Reloads</div><div class="value">{{ policy_status.reload_count }}</div></div>
+  <div class="stat {{ 'bad' if policy_status.last_error else 'ok' }}"><div class="label">Last reload</div>
+    <div class="value small">{{ 'rejected' if policy_status.last_error else 'ok' }}</div></div>
+</div>
+{% if policy_status.last_error %}<p class="notice bad">{{ policy_status.last_error }}</p>{% endif %}
+{% for role in policy_roles %}
+<div class="card">
+  <div class="card-head">
+    <div><h2>{{ role.name }}</h2>{% if role.description %}<div class="hint">{{ role.description }}</div>{% endif %}</div>
+    <a class="btn small" href="{{ prefix }}/playground?role={{ role.name|urlencode }}">Try as {{ role.name }}</a>
+  </div>
+  <p class="small muted">Sees {{ role.visible|length }} tool{{ '' if role.visible|length == 1 else 's' }}:
+    {% for name in role.visible %}<span class="chip">{{ name }}</span>{% else %}none{% endfor %}</p>
+  <div class="table-wrap">
+    <table class="data">
+      <thead><tr><th>Rule</th><th>Effect</th><th>Tools</th><th>Argument constraints</th><th>Approval</th><th>Risk</th></tr></thead>
+      <tbody>
+      {% for rule in role.rules %}
+        <tr>
+          <td class="mono small">{{ rule.id }}{% if rule.description %}<div class="faint">{{ rule.description }}</div>{% endif %}</td>
+          <td><span class="badge {{ 'ok' if rule.effect == 'allow' else 'bad' }}">{{ rule.effect }}</span></td>
+          <td>{% for tool in rule.tools %}<span class="chip">{{ tool }}</span>{% endfor %}</td>
+          <td>{% for argument, summary in rule.constraints %}<div class="small"><span class="mono">{{ argument }}</span>: {{ summary }}</div>{% else %}<span class="faint">none</span>{% endfor %}</td>
+          <td>{% if rule.require_approval is none %}<span class="faint">by risk</span>{% elif rule.require_approval %}<span class="badge warn">required</span>{% else %}<span class="badge neutral">waived</span>{% endif %}</td>
+          <td>{{ rule.risk or '-' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6"><div class="empty">No rules: this role can call nothing.</div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% if tool_risk %}
+<div class="card flush">
+  <div class="card-head"><h2>Risk overrides</h2></div>
+  <div class="table-wrap"><table class="data"><thead><tr><th>Tool</th><th>Risk</th></tr></thead><tbody>
+  {% for name, risk in tool_risk.items() %}<tr><td class="mono">{{ name }}</td><td>{{ risk }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</div>
+{% endif %}
+{% endblock %}

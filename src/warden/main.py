@@ -48,6 +48,7 @@ from warden.config import (
     load_gateway_config,
     load_servers_config,
 )
+from warden.console.web import CONSOLE_PREFIX, ConsoleDeps, build_console_routes
 from warden.db.engine import Database
 from warden.health import Readiness, postgres_check, redis_check
 from warden.http_limits import RequestLimitsMiddleware
@@ -565,6 +566,28 @@ def create_app(
     )
     authenticator = Authenticator(api_keys=ApiKeyStore(db), tokens=token_service)
 
+    # One pipeline for every way a call can arrive - the MCP endpoint and the console's
+    # playground - so the console demonstrates exactly what a client gets, not a lookalike.
+    pipeline_factory = _select_pipeline(
+        pipeline_stages,
+        build_pipeline_factory(
+            registry,
+            servers,
+            manager,
+            policies,
+            limiter,
+            gateway.limits,
+            audit,
+            pins,
+            gateway.scan,
+            output_scanner,
+            approvals,
+            gateway.approval.wait_seconds,
+            telemetry,
+        ),
+    )
+    tool_filter = build_tool_filter(policies, pins)
+
     routes.extend(
         build_admin_routes(
             AdminDeps(
@@ -578,6 +601,22 @@ def create_app(
         )
     )
     routes.extend(build_approval_routes(approvals=approvals, api_keys=ApiKeyStore(db)))
+    routes.extend(
+        build_console_routes(
+            ConsoleDeps(
+                api_keys=ApiKeyStore(db),
+                approvals=approvals,
+                audit=audit,
+                pins=pins,
+                policies=policies,
+                registry=registry,
+                upstreams=manager,
+                servers=servers,
+                pipeline_factory=pipeline_factory if mount_mcp else None,
+                tool_filter=tool_filter,
+            )
+        )
+    )
     routes.append(Route(JWKS_PATH, make_jwks(jwt_keys), methods=["GET"]))
     if settings.metrics_enabled:
         routes.append(
@@ -608,26 +647,9 @@ def create_app(
             servers_config=servers,
             registry=registry,
             upstreams=manager,
-            pipeline_factory=_select_pipeline(
-                pipeline_stages,
-                build_pipeline_factory(
-                    registry,
-                    servers,
-                    manager,
-                    policies,
-                    limiter,
-                    gateway.limits,
-                    audit,
-                    pins,
-                    gateway.scan,
-                    output_scanner,
-                    approvals,
-                    gateway.approval.wait_seconds,
-                    telemetry,
-                ),
-            ),
+            pipeline_factory=pipeline_factory,
             principal_resolver=lambda ctx: principal_from_request(ctx.request),
-            tool_filter=build_tool_filter(policies, pins),
+            tool_filter=tool_filter,
         )
         mcp_server = build_mcp_server(deps)
         session_manager = StreamableHTTPSessionManager(
@@ -684,6 +706,7 @@ def create_app(
         resource_metadata_url=protected_resource_metadata_url(settings.warden_resource_url),
     )
     app.add_middleware(ApprovalSecurityHeaders, prefix="/approvals")
+    app.add_middleware(ApprovalSecurityHeaders, prefix=CONSOLE_PREFIX)
     # Inside the request-id middleware so a 413 still carries an id, outside auth so an
     # oversized body is refused before anything parses it.
     app.add_middleware(
